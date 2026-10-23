@@ -31,7 +31,7 @@ Pull updates here and rerun the installer. Make durable changes in this repo rat
 | `global/AGENTS.md` | General working rules; project-specific rules remain in project repos |
 | `global/guides/` | On-demand skill authoring instructions |
 | `.opencode/skills/` | Global `skills/`: coder, design, writer, researcher, deep-research, frontend-design |
-| `.opencode/commands/` | Global `commands/`, including `/sessions-move` |
+| `.opencode/commands/` | Global `commands/`, including `/sessions-move` and `/remember` |
 | `preferences/` | UI and analytical-data preferences, read when relevant |
 | `presets/blender/` | Optional workspace config and beginner guide; not installed globally |
 
@@ -40,6 +40,21 @@ Project `opencode.json` settings override global defaults. Project instructions 
 Gmail authentication remains machine-local. Existing OAuth settings are preserved; a fresh machine must configure/authenticate its own Gmail integration. The harness does not copy `.env`, provider credentials, or token stores from another machine.
 
 For Blender, copy the two files in `presets/blender/` to a new dedicated workspace and start OpenCode there. Install `uvx` and enable the Blender add-on as described in the preset guide. Merge the preset instead of overwriting configuration in an existing workspace.
+
+## Lightweight project memory
+
+The initial memory approach is a plain `MEMORY.md` in each project. Hindsight is deferred. This adds no service, database, plugin, or package dependency.
+
+After installing this harness and restarting OpenCode:
+
+- The global instructions tell the agent to read the active project's `MEMORY.md` at the start of a session, if it exists.
+- Use `/remember` to save a concise summary of useful decisions, lessons, and the next step. Use `/remember <specific point>` to save just that point.
+- Each project keeps its own file. An existing project-specific memory convention takes precedence. Notes are created only when requested, and no empty file is needed.
+- The agent updates existing notes and aims to keep the file within 150 lines. Notes include dates and source references where available, with suggestions distinguished from confirmed decisions.
+
+Reading and updating memory rely on the agent following these instructions; this is not a background capture or retrieval service. A new session can be asked to read `MEMORY.md` explicitly if needed. Current source files, project rules, and verified records remain authoritative.
+
+Memory files stay in the active project and are not copied by the harness installer. They are never automatically committed or synced. Review their content before choosing to track them in Git; avoid secrets and private financial records. To remove a saved point, ask the agent to forget it or edit the Markdown file directly.
 
 ## Validation
 
