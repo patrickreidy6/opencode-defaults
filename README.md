@@ -43,16 +43,18 @@ For Blender, copy the two files in `presets/blender/` to a new dedicated workspa
 
 ## Lightweight project memory
 
-The initial memory approach is a plain `MEMORY.md` in each project. Hindsight is deferred. This adds no service, database, plugin, or package dependency.
+The initial memory approach is a plain `memory.md` in each project. Hindsight is deferred. This adds no service, database, plugin, or package dependency.
+
+`memory.md` follows the lowercase filename convention and is read through agent instructions, as supported by [OpenCode's rules documentation](https://opencode.ai/docs/rules/#manual-instructions-in-agentsmd). Keep `AGENTS.md` uppercase because OpenCode uses that name for rule-file discovery.
 
 After installing this harness and restarting OpenCode:
 
-- The global instructions tell the agent to read the active project's `MEMORY.md` at the start of a session, if it exists.
+- The global instructions tell the agent to read the active project's `memory.md` at the start of a session, if it exists.
 - Use `/remember` to save a concise summary of useful decisions, lessons, and the next step. Use `/remember <specific point>` to save just that point.
 - Each project keeps its own file. An existing project-specific memory convention takes precedence. Notes are created only when requested, and no empty file is needed.
 - The agent updates existing notes and aims to keep the file within 150 lines. Notes include dates and source references where available, with suggestions distinguished from confirmed decisions.
 
-Reading and updating memory rely on the agent following these instructions; this is not a background capture or retrieval service. A new session can be asked to read `MEMORY.md` explicitly if needed. Current source files, project rules, and verified records remain authoritative.
+Reading and updating memory rely on the agent following these instructions; this is not a background capture or retrieval service. A new session can be asked to read `memory.md` explicitly if needed. Current source files, project rules, and verified records remain authoritative.
 
 Memory files stay in the active project and are not copied by the harness installer. They are never automatically committed or synced. Review their content before choosing to track them in Git; avoid secrets and private financial records. To remove a saved point, ask the agent to forget it or edit the Markdown file directly.
 
