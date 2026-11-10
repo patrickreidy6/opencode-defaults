@@ -12,6 +12,12 @@ Follow the open [Agent Skills specification](https://agentskills.io/specificatio
 - **Personal cross-project defaults:** Maintain in `pr4/.opencode/skills/<name>/SKILL.md` and deploy globally via `pr4`'s installer (`~/.config/opencode/skills/`).
 - Inspect existing skills before adding a new one; extend an existing skill when its trigger domain already covers the task.
 
+## Component Ladder & Evidence Gate
+- Pick the cheapest reliable mechanism: deterministic `scripts/` for repeatable parsing/validation/calculations -> on-demand `skills/` for situation-triggered procedures -> `plugins` for unskippable tool-loop checks -> always-on `AGENTS.md` last (treat `AGENTS.md` as zero-sum: trim when adding).
+- Trigger skills on a specific **situation** (for example, *"when reconciling two sources that disagree"*), not a broad topic, and add a matching one-line situation trigger in the owning `AGENTS.md` so the skill is not overlooked.
+- Bundle any helper a skill invokes inside `<skill-name>/scripts/` so the skill travels as a self-contained unit.
+- Add or expand skills and rules only when motivated by an observed failure, rollout divergence, or repeated manual friction—never speculative prose—and never override a prompt- or caller-specified deliverable format or schema.
+
 ## Directory Layout & Progressive Disclosure
 Agents load skills in three stages to protect context:
 1. **Discovery (~20-50 tokens):** Only `name` and `description` load at session startup.

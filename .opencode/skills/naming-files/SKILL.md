@@ -10,4 +10,4 @@ description: Use when creating, saving, exporting, or renaming files, documents,
 - Prefer lowercase hyphenated words, with a hyphen between the date and title.
 - Omit unknown dates; keep ongoing topics and projects undated unless a date helps distinguish them.
 - Use numbering when an intentional order helps.
-- Preserve names required by languages, frameworks, tools, or repositories (such as `AGENTS.md`, `SKILL.md`, `README.md`, `Dockerfile`, or Python `snake_case` modules).
+- Preserve exact filenames, paths, and extensions required by the user's request, caller/test contracts, downstream schemas, languages, frameworks, tools, or repositories (such as `AGENTS.md`, `SKILL.md`, `README.md`, `Dockerfile`, or Python `snake_case` modules).

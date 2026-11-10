@@ -12,5 +12,5 @@ description: Use when creating, organizing, or renaming directories, folders, or
 - Do not use filesystem timestamps as collection dates unless explicitly requested.
 - Use `.tmp` directories for files intended to be deleted.
 - Use numbering when an intentional order helps.
-- Preserve names required by applications, repositories, tools, or providers; check dependencies before renaming.
+- Preserve names required by the user's request, caller/test contracts, applications, repositories, tools, or providers; check dependencies before renaming.
 - Never merge or overwrite directories to resolve a collision; add a meaningful distinguishing detail.
