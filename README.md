@@ -51,9 +51,24 @@ sh ./install.sh
 
 ### Installer Behavior
 - Resolves destination to `--destination`, else `$XDG_CONFIG_HOME/opencode` (when absolute), else `~/.config/opencode`.
-- Deep-merges `opencode.json` objects and **unions root arrays** (`plugins`, `instructions`, `skills`) so machine-local plugins and auth settings survive.
+- Deep-merges `opencode.json` objects and **unions root arrays** (`plugins`, `instructions`, `skills`). Previous repository-managed Superpowers Git references are replaced by the selected pin; other plugin entries and machine-local auth settings are preserved.
 - When `AGENTS.local.md` does not already exist, preserves any pre-existing custom `AGENTS.md` as `AGENTS.local.md` (loaded via `~/.config/opencode/AGENTS.local.md` in standard `~/.config/opencode` setups, and skipped silently when absent).
 - Backs up overwritten files under `<destination>/backups/harness-<timestamp>/` and leaves unrelated files (`service.json`, `cli.json`, local `commands/`) untouched.
+
+### Superpowers Version and Cache
+
+[`global/opencode.json`](global/opencode.json) pins Superpowers to commit `22f0b463e7a5e579904dd6211a520321035526f7` (package version **7.0.2**). Fresh installations use that same source revision. Rerunning the installer replaces earlier `superpowers@git+https://github.com/obra/superpowers.git` string entries, including entries with a `#revision`, so old references do not accumulate.
+
+The installer copies your settings, global instructions, and personal skills into the OpenCode configuration directory. OpenCode downloads Superpowers and its bundled skills into its own package cache (`~/.cache/opencode/npm/` on the standard setup). Let each machine build its cache; the Git reference in this repository is the portable dependency declaration. OpenCode installs missing packages in the background and reuses downloaded copies.
+
+To upgrade Superpowers deliberately:
+
+1. Select and review an upstream revision, recording its full Git commit hash.
+2. Update the `#commit` in `global/opencode.json`, the `PINNED_SUPERPOWERS` fixture in `tests/test_install.py`, and the version note above.
+3. Run the [installer tests](#validation), then preview and apply the platform-specific installer using the commands under [Install or Update](#install-or-update).
+4. Run `opencode plugin list` and confirm Superpowers loads from the selected revision. Commit the tested defaults, pull them on other machines, and rerun the installer there.
+
+OpenCode's `opencode plugin update` skips full-commit pins. Moving the pin in this repository is what selects the next Superpowers revision; see [OpenCode's plugin documentation](https://opencode.ai/v2/docs/plugins).
 
 ## Starting a New Project Repo With Extra MCPs or Plugins
 

@@ -7,7 +7,7 @@
     }
   },
   "plugins": [
-    "superpowers@git+https://github.com/obra/superpowers.git"
+    "superpowers@git+https://github.com/obra/superpowers.git#22f0b463e7a5e579904dd6211a520321035526f7"
   ],
   "instructions": [
     "~/.config/opencode/AGENTS.local.md"

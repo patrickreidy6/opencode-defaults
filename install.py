@@ -18,6 +18,7 @@ SKIP_PARTS = {"__pycache__", "node_modules", ".venv", ".git"}
 SKIP_SUFFIXES = {".pyc", ".pyo", ".pyd"}
 PR4_AGENTS_HEADER = "# Personal OpenCode Defaults"
 UNION_ROOT_LIST_KEYS = {"plugins", "instructions", "skills"}
+SUPERPOWERS_PACKAGE = "superpowers@git+https://github.com/obra/superpowers.git"
 RETIRED_PR4_DIRS = (
     Path("skills/coder"),
     Path("skills/design"),
@@ -56,6 +57,10 @@ def clean_legacy_v1_keys(config: dict[str, Any]) -> None:
         mcp.pop("gmail", None)
 
 
+def is_managed_superpowers_plugin(plugin: Any) -> bool:
+    return isinstance(plugin, str) and plugin.partition("#")[0] == SUPERPOWERS_PACKAGE
+
+
 def merge_settings(
     current: dict[str, Any],
     incoming: dict[str, Any],
@@ -77,7 +82,11 @@ def merge_settings(
             result[key] = merge_settings(result[key], in_val, path=(*path, key))
         elif is_root and key in UNION_ROOT_LIST_KEYS and isinstance(result[key], list) and isinstance(in_val, list):
             merged_list = copy.deepcopy(in_val)
+            replace_superpowers = key == "plugins" and any(is_managed_superpowers_plugin(p) for p in in_val)
             for item in result[key]:
+                # The repository selects one Superpowers revision; do not retain previous references.
+                if replace_superpowers and is_managed_superpowers_plugin(item):
+                    continue
                 if item not in merged_list:
                     merged_list.append(copy.deepcopy(item))
             result[key] = merged_list

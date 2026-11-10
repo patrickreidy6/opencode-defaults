@@ -7,8 +7,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from install import merge_settings
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 INSTALL_PY = REPO_ROOT / "install.py"
+SUPERPOWERS_PACKAGE = "superpowers@git+https://github.com/obra/superpowers.git"
+PINNED_SUPERPOWERS = SUPERPOWERS_PACKAGE + "#22f0b463e7a5e579904dd6211a520321035526f7"
 
 
 class InstallHarnessTests(unittest.TestCase):
@@ -87,7 +91,7 @@ class InstallHarnessTests(unittest.TestCase):
             self.assertEqual(
                 merged["plugins"],
                 [
-                    "superpowers@git+https://github.com/obra/superpowers.git",
+                    PINNED_SUPERPOWERS,
                     "local-custom-plugin",
                 ],
             )
@@ -147,6 +151,74 @@ class InstallHarnessTests(unittest.TestCase):
             merged2 = json.loads((dest / "opencode.json").read_text(encoding="utf-8"))
             self.assertEqual(merged2["plugins"], merged["plugins"])
             self.assertEqual(merged2["instructions"], merged["instructions"])
+
+    def test_superpowers_pin_converges_on_fresh_installs_and_migrations(self) -> None:
+        old_pin = SUPERPOWERS_PACKAGE + "#" + "1" * 40
+        cases = {
+            "fresh": None,
+            "other_plugins_only": [],
+            "floating": [SUPERPOWERS_PACKAGE],
+            "old_pin": [old_pin],
+            "multiple": [SUPERPOWERS_PACKAGE, old_pin, PINNED_SUPERPOWERS, SUPERPOWERS_PACKAGE + "#main"],
+            "already_pinned": [PINNED_SUPERPOWERS],
+        }
+        unrelated = [
+            "local-first",
+            "superpowers-helper",
+            "superpowers@git+https://github.com/example/superpowers.git#custom",
+            "superpowers@git+https://github.com/obra/superpowers.git-extra",
+            {"package": "local-last", "options": {"enabled": True}},
+            "-superpowers",
+        ]
+        for name, previous in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp:
+                dest = Path(tmp)
+                config_path = dest / "opencode.json"
+                original = None
+                if previous is not None:
+                    existing = {"plugins": [unrelated[0], *previous, *unrelated[1:]]}
+                    original = (json.dumps(existing, indent=2) + "\n").encode("utf-8")
+                    config_path.write_bytes(original)
+
+                preview = self.run_installer("--destination", str(dest), "--dry-run")
+                self.assertEqual(preview.returncode, 0, preview.stderr)
+                self.assertEqual(sorted(p.name for p in dest.iterdir()), [] if original is None else ["opencode.json"])
+                if original is not None:
+                    self.assertEqual(config_path.read_bytes(), original)
+
+                result = self.run_installer("--destination", str(dest))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                expected = [PINNED_SUPERPOWERS, *(unrelated if previous is not None else [])]
+                installed = json.loads(config_path.read_text(encoding="utf-8"))
+                self.assertEqual(installed["plugins"], expected)
+                if original is not None:
+                    backups = list((dest / "backups").glob("harness-*/opencode.json"))
+                    self.assertEqual(len(backups), 1)
+                    self.assertEqual(backups[0].read_bytes(), original)
+
+                repeated = self.run_installer("--destination", str(dest))
+                self.assertEqual(repeated.returncode, 0, repeated.stderr)
+                self.assertEqual(json.loads(config_path.read_text(encoding="utf-8")), installed)
+
+    def test_next_superpowers_pin_replaces_current_pin(self) -> None:
+        next_pin = SUPERPOWERS_PACKAGE + "#" + "2" * 40
+        current = {"plugins": [PINNED_SUPERPOWERS, "custom-plugin"]}
+        incoming = {"plugins": [next_pin]}
+
+        merged = merge_settings(current, incoming)
+
+        self.assertEqual(merged["plugins"], [next_pin, "custom-plugin"])
+        self.assertEqual(current, {"plugins": [PINNED_SUPERPOWERS, "custom-plugin"]})
+        self.assertEqual(incoming, {"plugins": [next_pin]})
+
+    def test_superpowers_reference_is_preserved_without_incoming_managed_plugin(self) -> None:
+        current = {"plugins": [SUPERPOWERS_PACKAGE], "instructions": [SUPERPOWERS_PACKAGE]}
+        incoming = {"plugins": ["custom-plugin"], "instructions": ["custom-rules.md"]}
+
+        merged = merge_settings(current, incoming)
+
+        self.assertEqual(merged["plugins"], ["custom-plugin", SUPERPOWERS_PACKAGE])
+        self.assertEqual(merged["instructions"], ["custom-rules.md", SUPERPOWERS_PACKAGE])
 
     def test_wrappers_ps1_and_sh(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
