@@ -122,7 +122,14 @@ class InstallHarnessTests(unittest.TestCase):
             self.assertTrue((backups[0] / "AGENTS.md").is_file())
 
             # Skills deployed
-            for skill_name in ("writer", "frontend-design", "data-preferences", "skill-authoring"):
+            for skill_name in (
+                "writer",
+                "frontend-design",
+                "data-preferences",
+                "skill-authoring",
+                "naming-files",
+                "naming-directories",
+            ):
                 self.assertTrue((dest / "skills" / skill_name / "SKILL.md").is_file(), skill_name)
             self.assertTrue(
                 (dest / "skills" / "frontend-design" / "references" / "ui-preferences.md").is_file()

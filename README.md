@@ -12,6 +12,8 @@ Lean, cross-platform OpenCode V2 base defaults for Windows PCs, Linux hosts (`am
 | `.opencode/skills/frontend-design/` | Visual UI design craft + `references/ui-preferences.md` for greenfield interfaces |
 | `.opencode/skills/data-preferences/` | Analytical data defaults: local/NAS first (Google Cloud / Drive 5 TB when cloud is needed, not S3), raw CSV + Parquet + Polars + DuckDB |
 | `.opencode/skills/skill-authoring/` | [Agent Skills](https://agentskills.io/home) progressive-disclosure spec, OpenCode V2 layout, and `skills-ref` validation |
+| `.opencode/skills/naming-files/` | Concise lowercase hyphenated file and date-prefix naming rules |
+| `.opencode/skills/naming-directories/` | Concise lowercase hyphenated directory, hierarchy, and `.tmp` naming rules |
 
 Domain-specific MCP servers, plugins, and skills stay out of this base harness so unrelated workspaces pay zero extra context tokens.
 
@@ -84,6 +86,8 @@ uv run --no-project --with "git+https://github.com/agentskills/agentskills.git#s
 uv run --no-project --with "git+https://github.com/agentskills/agentskills.git#subdirectory=skills-ref" python -m skills_ref.cli validate .opencode/skills/frontend-design
 uv run --no-project --with "git+https://github.com/agentskills/agentskills.git#subdirectory=skills-ref" python -m skills_ref.cli validate .opencode/skills/data-preferences
 uv run --no-project --with "git+https://github.com/agentskills/agentskills.git#subdirectory=skills-ref" python -m skills_ref.cli validate .opencode/skills/skill-authoring
+uv run --no-project --with "git+https://github.com/agentskills/agentskills.git#subdirectory=skills-ref" python -m skills_ref.cli validate .opencode/skills/naming-files
+uv run --no-project --with "git+https://github.com/agentskills/agentskills.git#subdirectory=skills-ref" python -m skills_ref.cli validate .opencode/skills/naming-directories
 ```
 
 ## Related Repos
