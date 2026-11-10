@@ -33,6 +33,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File ./install.ps1 -WhatIf
 powershell -NoProfile -ExecutionPolicy Bypass -File ./install.ps1
 ```
 
+On Windows, keep the standalone OpenCode CLI binary at `$HOME\.opencode\bin\opencode.exe` on your User `Path` (with Git for Windows installed) rather than unpacking `opencode.exe` into a custom folder such as `%LOCALAPPDATA%\Programs\OpenCodeCLI`. OpenCode only detects standalone `curl` installs at `~/.opencode/bin/opencode.exe`; custom paths skip CLI/TUI updates with `installation method not found`. After an OpenCode CLI upgrade, run `opencode service restart` from a new terminal so the background server switches to the updated binary.
+
 **Linux / Halo Docker Workspaces (`bash` / `sh`):**
 ```sh
 sh ./install.sh --dry-run
@@ -78,6 +80,8 @@ When starting a new repo (for example, a website repo `xyz` that needs extra MCP
 ```
 
 (Or run `opencode mcp add abc --url ...` from inside `xyz`.) OpenCode V2 merges `~/.config/opencode/opencode.json` + `xyz/opencode.json` at runtime, so `xyz` gets `superpowers` + `context7` + `abc` + `def` while all other workspaces remain lean.
+
+For repository settings on GitHub, keep **Pull requests** and **Allow squash merging** enabled (for optional review of larger or agent-generated changes with single-commit history) and turn off **Projects**, **Allow merge commits**, and **Allow rebase merging** unless a project specifically needs them.
 
 ## Validation
 
