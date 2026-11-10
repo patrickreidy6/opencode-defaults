@@ -9,7 +9,7 @@ Apply these defaults when designing new data storage or analytical pipelines. Do
 
 ## Storage Location Priority
 1. **Local filesystem / NAS first (default):** Prefer local workspace storage and NAS-backed paths by default.
-2. **Cloud storage when needed — Google Cloud / Google Drive (not AWS S3):** AWS S3 is no longer the preferred cloud provider. When cloud storage, off-site sync, or cloud object storage is needed, prefer **Google Cloud / Google Drive** (linked with `patrickreidy6@gmail.com`, which includes 5 TB of storage on the Google AI Pro plan). Only use S3 when integrating with an existing system that already requires it.
+2. **Cloud storage when needed — Google Drive:** cloud storage, off-site sync, or cloud object storage is needed, prefer **Google Cloud / Google Drive** (linked with `patrickreidy6@gmail.com`)
 
 ## Processing & Query Stack
 Use **preserved raw CSVs, Parquet for processed data, Polars for transformations, and DuckDB for SQL analytics**. Add Pydantic for structured input/contract validation where helpful, and Delta Lake only when transactional table guarantees justify it.
