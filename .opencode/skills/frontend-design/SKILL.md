@@ -11,6 +11,7 @@ Use for visual design work, not a behavior-only frontend change or isolated typo
 ## Design direction
 
 - Ground the design in the product, audience, content, and primary action. Infer routine choices from context; clarify a missing product goal if it would change the design substantially.
+- Reuse an existing project's design system, tokens, and components first. For greenfield interfaces without established project styling, read [references/ui-preferences.md](references/ui-preferences.md) and apply those defaults unless the user asks for a different direction.
 - For a new visual direction, choose a coherent palette, type hierarchy, spacing system, and layout appropriate to the subject. A distinctive element should serve the brief, not impose novelty on an established interface.
 - Use real content where available. Mark invented sample content as illustrative rather than presenting fabricated product claims or metrics as facts.
 

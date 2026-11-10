@@ -1,21 +1,21 @@
 # OpenCode Harness (pr4)
 
-This repository maintains personal global OpenCode defaults. It is not an application runtime dependency.
+This repository maintains personal global OpenCode V2 defaults across Windows workstations, Linux hosts, and Docker workspace containers. It is not an application runtime dependency.
 
-## Source layout
-- `global/opencode.json`: portable settings merged into the user's existing global config.
-- `global/AGENTS.md`: general rules installed globally. This file contains harness-repo-specific guidance instead.
-- `global/guides/`: on-demand instructions installed with the harness.
-- `.opencode/skills/` and `.opencode/commands/`: shared source assets, installed under global `skills/` and `commands/`.
-- `preferences/`: optional UI/data guidance; project rules take precedence.
-- `presets/blender/`: opt-in configuration for a separate Blender workspace.
+## Source Layout
+- `global/opencode.json`: portable OpenCode V2 defaults merged into `~/.config/opencode/opencode.json` (or `$XDG_CONFIG_HOME/opencode/opencode.json`).
+- `global/AGENTS.md`: concise, OS-neutral global rules installed as `AGENTS.md`. Machine-specific instructions belong in `~/.config/opencode/AGENTS.local.md` (loaded via `instructions` when present). This root file holds `pr4`-specific maintenance guidance instead.
+- `.opencode/skills/`: shared personal Agent Skills (`writer`, `frontend-design` + `references/ui-preferences.md`, `data-preferences`, `skill-authoring`), installed under global `skills/`.
+- `install.py` (`install.ps1` / `install.sh`): cross-platform Python 3 standard-library installer with backup, `$XDG_CONFIG_HOME` resolution, V1 cleanup, and array-union merging.
+- `tests/test_install.py`: automated stdlib `unittest` suite for installer behavior.
 
 ## Maintenance
-- Load `customize-opencode` and check https://opencode.ai/config.json before changing configuration.
-- Follow [global/guides/skill-authoring.md](global/guides/skill-authoring.md) and fetch the current specification for skill work.
-- Preserve licenses, attribution, and resource links. Keep application-specific skills in their app repo.
-- Use `powershell -NoProfile -File ./install.ps1 -WhatIf` to preview and `powershell -NoProfile -File ./install.ps1` to deploy.
-- Test installer changes against an isolated `-Destination` first. Check that unknown config keys and local authentication settings survive and existing files are backed up.
-- Validate skills with `skills-ref validate .opencode/skills/<name>` or the documented uvx fallback. Check discovery from a separate app repo after installation.
-- Credentials, authentication stores, `.env` files, and install backups never belong in this repo.
-- Quit and restart OpenCode after installation or any configuration-time change.
+- Load the built-in `opencode` skill and consult <https://opencode.ai/v2/docs/config> before changing OpenCode configuration.
+- Load `skill-authoring` and check <https://agentskills.io/specification> when adding or editing skills. Keep `global/AGENTS.md` short and OS-neutral; package detailed domain defaults as progressive-disclosure skills instead.
+- Preserve upstream skill licenses and attribution. Keep project-specific MCP servers, plugins, and domain skills inside their owning project repo (`<repo>/opencode.json` and `<repo>/.opencode/skills/`).
+- Preview and deploy:
+  - Windows: `powershell -NoProfile -ExecutionPolicy Bypass -File ./install.ps1 -WhatIf` then `powershell -NoProfile -ExecutionPolicy Bypass -File ./install.ps1` (or `uv run --no-project python ./install.py`)
+  - Linux / Docker: `sh ./install.sh --dry-run` then `sh ./install.sh` (or `python3 ./install.py`)
+- Run `uv run --no-project python -m unittest discover -s tests -v` (or `python3 -m unittest discover -s tests -v`) and test against an isolated `--destination` after installer edits.
+- Validate changed skills with `uv run --no-project --with "git+https://github.com/agentskills/agentskills.git#subdirectory=skills-ref" python -m skills_ref.cli validate .opencode/skills/<name>`.
+- Never commit credentials, OAuth tokens, `.env` files, or install backups.

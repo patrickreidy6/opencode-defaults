@@ -1,20 +1,23 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "model": "openai/gpt-6-astra",
-  "small_model": "openai/gpt-5.6-sol",
-  "experimental": {
-    "openTelemetry": true
+  "agents": {
+    "title": {
+      "model": "openai/gpt-5.6-sol"
+    }
   },
+  "plugins": [
+    "superpowers@git+https://github.com/obra/superpowers.git"
+  ],
+  "instructions": [
+    "~/.config/opencode/AGENTS.local.md"
+  ],
   "mcp": {
-    "context7": {
-      "type": "remote",
-      "url": "https://mcp.context7.com/mcp",
-      "enabled": true
-    },
-    "gmail": {
-      "type": "remote",
-      "url": "https://gmailmcp.googleapis.com/mcp/v1",
-      "enabled": true
+    "servers": {
+      "context7": {
+        "type": "remote",
+        "url": "https://mcp.context7.com/mcp"
+      }
     }
   }
 }

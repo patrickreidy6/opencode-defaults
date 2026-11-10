@@ -1,2 +1,3 @@
-# Auto detect text files and perform LF normalization
+# Normalize text files and enforce LF on shell scripts for Linux/Docker portability
 * text=auto
+*.sh text eol=lf

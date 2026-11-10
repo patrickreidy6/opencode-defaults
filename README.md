@@ -1,63 +1,94 @@
 # OpenCode Harness (pr4)
 
-Personal OpenCode defaults, reusable skills, commands, and optional preferences. This is the source of truth for the global harness installed at `~/.config/opencode/`.
+Lean, cross-platform OpenCode V2 base defaults for Windows PCs, Linux hosts (`amd-halo`), and Docker workspace containers (`ops-infra`).
 
-## Install or update
-
-Requires Windows PowerShell 5.1+, OpenCode, and Git. Clone this repo and run from its root:
-
-```powershell
-powershell -NoProfile -File ./install.ps1 -WhatIf
-powershell -NoProfile -File ./install.ps1
-```
-
-**Quit and restart OpenCode after installation.** Configuration and skill metadata are loaded at startup.
-
-The installer:
-- Merges tracked defaults into the existing `opencode.json`, preserving unrelated settings and local authentication configuration. Tracked values win on conflicts.
-- Installs general instructions, preferences, guides, shared skills, and commands.
-- Backs up overwritten files under `~/.config/opencode/backups/harness-<timestamp>/`.
-- Leaves unrelated files and authentication stores in place. The deployable config contains no credentials.
-
-Use `-Destination <directory>` to test an installation in isolation. If `opencode.jsonc` already exists, reconcile it first: the installer stops rather than introducing competing global configs. To restore an installation, close OpenCode, restore backed-up files to their matching paths, and remove only newly installed harness-owned files if necessary.
-
-Pull updates here and rerun the installer. Make durable changes in this repo rather than only in the installed copies.
-
-## What is shared
+## What Is Included
 
 | Source | Installed location / purpose |
 |---|---|
-| `global/opencode.json` | Model defaults, Context7, Gmail, existing OpenTelemetry preference |
-| `global/AGENTS.md` | General working rules; project-specific rules remain in project repos |
-| `global/guides/` | On-demand skill authoring instructions |
-| `.opencode/skills/` | Global `skills/`: coder, design, writer, researcher, deep-research, frontend-design |
-| `.opencode/commands/` | Global `commands/`, including `/sessions-move` |
-| `preferences/` | UI and analytical-data preferences, read when relevant |
-| `presets/blender/` | Optional workspace config and beginner guide; not installed globally |
+| `global/opencode.json` | Native OpenCode V2 defaults: `openai/gpt-6-astra`, title model `openai/gpt-5.6-sol`, `superpowers` plugin, `context7` MCP, and optional `~/.config/opencode/AGENTS.local.md` |
+| `global/AGENTS.md` | Short, OS-neutral global working and communication rules |
+| `.opencode/skills/writer/` | Concise, practical prose voice for emails, messages, and docs |
+| `.opencode/skills/frontend-design/` | Visual UI design craft + `references/ui-preferences.md` for greenfield interfaces |
+| `.opencode/skills/data-preferences/` | Analytical data defaults: local/NAS first (Google Cloud / Drive 5 TB when cloud is needed, not S3), raw CSV + Parquet + Polars + DuckDB |
+| `.opencode/skills/skill-authoring/` | [Agent Skills](https://agentskills.io/home) progressive-disclosure spec, OpenCode V2 layout, and `skills-ref` validation |
 
-Project `opencode.json` settings override global defaults. Project instructions and existing architectures take precedence over generic UI/data preferences. The trading-only Cerebras and Massive skills live in pr6, not here.
+Domain-specific MCP servers, plugins, and skills stay out of this base harness so unrelated workspaces pay zero extra context tokens.
 
-Gmail authentication remains machine-local. Existing OAuth settings are preserved; a fresh machine must configure/authenticate its own Gmail integration. The harness does not copy `.env`, provider credentials, or token stores from another machine.
+## Install or Update
 
-For Blender, copy the two files in `presets/blender/` to a new dedicated workspace and start OpenCode there. Install `uvx` and enable the Blender add-on as described in the preset guide. Merge the preset instead of overwriting configuration in an existing workspace.
+Requires OpenCode V2 (`2.0.4+`), Git, and Python 3 (or `uv`).
+
+**Windows (PowerShell):**
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File ./install.ps1 -WhatIf
+powershell -NoProfile -ExecutionPolicy Bypass -File ./install.ps1
+```
+
+**Linux / Halo Docker Workspaces (`bash` / `sh`):**
+```sh
+sh ./install.sh --dry-run
+sh ./install.sh
+```
+
+In `ops-infra` containers where `/home/builder` is persistent and `/home/builder/.local/bin` is on `PATH`, install OpenCode V2 and link its binary once per workspace:
+```sh
+curl -fsSL https://opencode.ai/v2/install | bash
+ln -sf "$HOME/.opencode/bin/opencode" "$HOME/.local/bin/opencode"
+sh ./install.sh
+```
+(`opencode upgrade` resolves symlinks via `realPath`, so `~/.local/bin/opencode -> ~/.opencode/bin/opencode` preserves automatic `curl` updates while working in non-login SSH shells.)
+
+### Installer Behavior
+- Resolves destination to `--destination`, else `$XDG_CONFIG_HOME/opencode`, else `~/.config/opencode`.
+- Deep-merges `opencode.json` objects and **unions arrays** (`plugins`, `instructions`, `skills`) so machine-local plugins and auth settings survive.
+- Preserves any pre-existing non-`pr4` `AGENTS.md` into `AGENTS.local.md` (which OpenCode loads automatically when present and skips silently on machines/containers where absent).
+- Backs up overwritten files under `<destination>/backups/harness-<timestamp>/` and leaves unrelated files (`service.json`, `cli.json`, local `commands/`) untouched.
+
+## Starting a New Project Repo With Extra MCPs or Plugins
+
+Once `pr4` is installed globally on a machine or container, every repo automatically inherits `superpowers`, `context7`, your model defaults, and global skills. You do **not** copy `pr4` files into new repositories.
+
+When starting a new repo (for example, a website repo `xyz` that needs extra MCP servers `abc` and `def`), declare **only** the project-specific additions in `xyz/opencode.json`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "servers": {
+      "abc": {
+        "type": "remote",
+        "url": "https://mcp.example.com/abc"
+      },
+      "def": {
+        "type": "local",
+        "command": ["npx", "-y", "@example/def-mcp"]
+      }
+    }
+  }
+}
+```
+
+(Or run `opencode mcp add abc --url ...` from inside `xyz`.) OpenCode V2 merges `~/.config/opencode/opencode.json` + `xyz/opencode.json` at runtime, so `xyz` gets `superpowers` + `context7` + `abc` + `def` while all other workspaces remain lean.
 
 ## Validation
 
-Use the current [OpenCode schema](https://opencode.ai/config.json) and [Agent Skills specification](https://agentskills.io/specification). Validate each shared skill, for example:
-
-```powershell
-uvx --from "git+https://github.com/agentskills/agentskills.git#subdirectory=skills-ref" skills-ref validate .opencode/skills/design
+Run the installer unit tests:
+```sh
+uv run --no-project python -m unittest discover -s tests -v
 ```
 
-Also check resource links and discovery from another repo (`opencode debug skill`). Avoid sharing resolved configuration output because it can contain local authentication settings. Research helper dependencies in `.opencode/skills/deep-research/requirements.txt` are optional and only needed for those utilities.
+Validate each skill against the [Agent Skills specification](https://agentskills.io/specification):
+```sh
+uv run --no-project --with "git+https://github.com/agentskills/agentskills.git#subdirectory=skills-ref" python -m skills_ref.cli validate .opencode/skills/writer
+uv run --no-project --with "git+https://github.com/agentskills/agentskills.git#subdirectory=skills-ref" python -m skills_ref.cli validate .opencode/skills/frontend-design
+uv run --no-project --with "git+https://github.com/agentskills/agentskills.git#subdirectory=skills-ref" python -m skills_ref.cli validate .opencode/skills/data-preferences
+uv run --no-project --with "git+https://github.com/agentskills/agentskills.git#subdirectory=skills-ref" python -m skills_ref.cli validate .opencode/skills/skill-authoring
+```
 
-Upstream skill licenses and attribution are retained beside the skills.
-
-## Related repos
-
+## Related Repos
 - [pr3 — media](https://github.com/patrickreidy6/pr3)
 - [pr5 — travel](https://github.com/patrickreidy6/pr5)
 - [pr6 — trader](https://github.com/patrickreidy6/pr6)
-- [pr2 — historical archive](https://github.com/patrickreidy6/pr2)
-
-Extracted with a fresh history on September 30, 2026. The original monorepo history, session transcripts, and retired experiments remain in pr2.
+- [pr7 — organization & workflow](https://github.com/patrickreidy6/pr7)
+- [ops-infra — Halo workspaces](https://github.com/patrickreidy6/ops-infra)
