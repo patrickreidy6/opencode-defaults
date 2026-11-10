@@ -129,8 +129,10 @@ class InstallHarnessTests(unittest.TestCase):
                 "skill-authoring",
                 "naming-files",
                 "naming-directories",
+                "socratic-tutor",
             ):
                 self.assertTrue((dest / "skills" / skill_name / "SKILL.md").is_file(), skill_name)
+            self.assertTrue((dest / "skills" / "socratic-tutor" / "LICENSE.md").is_file())
             self.assertTrue(
                 (dest / "skills" / "frontend-design" / "references" / "ui-preferences.md").is_file()
             )
