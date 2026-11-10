@@ -9,7 +9,7 @@ Follow the open [Agent Skills specification](https://agentskills.io/specificatio
 
 ## Placement
 - **Project-specific workflows:** `<repo>/.opencode/skills/<name>/SKILL.md`
-- **Personal cross-project defaults:** Maintain in `pr4/.opencode/skills/<name>/SKILL.md` and deploy globally via `pr4`'s installer (`~/.config/opencode/skills/`).
+- **Personal cross-project defaults:** Maintain in `opencode-defaults/.opencode/skills/<name>/SKILL.md` and deploy globally via `opencode-defaults`'s installer (`~/.config/opencode/skills/`).
 - Inspect existing skills before adding a new one; extend an existing skill when its trigger domain already covers the task.
 
 ## Component Ladder & Evidence Gate

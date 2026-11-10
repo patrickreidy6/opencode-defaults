@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cross-platform installer for the pr4 OpenCode V2 global harness."""
+"""Cross-platform installer for the opencode-defaults OpenCode V2 global harness."""
 
 from __future__ import annotations
 
