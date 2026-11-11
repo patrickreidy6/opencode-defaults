@@ -130,6 +130,7 @@ class InstallHarnessTests(unittest.TestCase):
                 "writer",
                 "frontend-design",
                 "data-preferences",
+                "project-setup",
                 "skill-authoring",
                 "naming-files",
                 "naming-directories",
@@ -139,6 +140,17 @@ class InstallHarnessTests(unittest.TestCase):
             self.assertTrue((dest / "skills" / "socratic-tutor" / "LICENSE.md").is_file())
             self.assertTrue(
                 (dest / "skills" / "frontend-design" / "references" / "ui-preferences.md").is_file()
+            )
+            self.assertTrue(
+                (dest / "skills" / "project-setup" / "references" / "preferred-devtools.md").is_file()
+            )
+            self.assertEqual(
+                (dest / "skills" / "project-setup" / "SKILL.md").read_bytes(),
+                (REPO_ROOT / ".opencode" / "skills" / "project-setup" / "SKILL.md").read_bytes(),
+            )
+            self.assertEqual(
+                (dest / "skills" / "project-setup" / "references" / "preferred-devtools.md").read_bytes(),
+                (REPO_ROOT / ".opencode" / "skills" / "project-setup" / "references" / "preferred-devtools.md").read_bytes(),
             )
 
             # Second run is idempotent and preserves AGENTS.local.md
@@ -151,6 +163,14 @@ class InstallHarnessTests(unittest.TestCase):
             merged2 = json.loads((dest / "opencode.json").read_text(encoding="utf-8"))
             self.assertEqual(merged2["plugins"], merged["plugins"])
             self.assertEqual(merged2["instructions"], merged["instructions"])
+            self.assertEqual(
+                (dest / "skills" / "project-setup" / "SKILL.md").read_bytes(),
+                (REPO_ROOT / ".opencode" / "skills" / "project-setup" / "SKILL.md").read_bytes(),
+            )
+            self.assertEqual(
+                (dest / "skills" / "project-setup" / "references" / "preferred-devtools.md").read_bytes(),
+                (REPO_ROOT / ".opencode" / "skills" / "project-setup" / "references" / "preferred-devtools.md").read_bytes(),
+            )
 
     def test_superpowers_pin_converges_on_fresh_installs_and_migrations(self) -> None:
         old_pin = SUPERPOWERS_PACKAGE + "#" + "1" * 40

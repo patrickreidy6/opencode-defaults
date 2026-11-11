@@ -5,7 +5,7 @@ This repository maintains personal global OpenCode V2 defaults across Windows wo
 ## Source Layout
 - `global/opencode.json`: portable OpenCode V2 defaults merged into `~/.config/opencode/opencode.json` (or `$XDG_CONFIG_HOME/opencode/opencode.json`).
 - `global/AGENTS.md`: concise, OS-neutral global rules installed as `AGENTS.md`. Machine-specific instructions belong in `~/.config/opencode/AGENTS.local.md` (loaded via `instructions` when present). This root file holds `opencode-defaults`-specific maintenance guidance instead.
-- `.opencode/skills/`: shared personal Agent Skills (`writer`, `frontend-design` + `references/ui-preferences.md`, `data-preferences`, `skill-authoring`, `naming-files`, `naming-directories`, `socratic-tutor`), installed under global `skills/`.
+- `.opencode/skills/`: shared personal Agent Skills (`writer`, `frontend-design` + `references/ui-preferences.md`, `data-preferences`, `project-setup` + `references/preferred-devtools.md`, `skill-authoring`, `naming-files`, `naming-directories`, `socratic-tutor`), installed under global `skills/`.
 - `install.py` (`install.ps1` / `install.sh`): cross-platform Python 3 standard-library installer with backup, `$XDG_CONFIG_HOME` resolution, V1 cleanup, and array-union merging.
 - `tests/test_install.py`: automated stdlib `unittest` suite for installer behavior.
 

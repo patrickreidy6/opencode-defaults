@@ -11,6 +11,7 @@ Lean, cross-platform OpenCode V2 base defaults for Windows PCs, Linux hosts (`am
 | `.opencode/skills/writer/` | Concise, practical prose voice for emails, messages, and docs |
 | `.opencode/skills/frontend-design/` | Visual UI design craft + `references/ui-preferences.md` for greenfield interfaces |
 | `.opencode/skills/data-preferences/` | Analytical data defaults: local/NAS first, Google Cloud / Google Drive when cloud storage is needed, raw CSV + Parquet + Polars + DuckDB |
+| `.opencode/skills/project-setup/` | New-repository bootstrapping & `opencode-defaults` adoption + `references/preferred-devtools.md` conditional tool register |
 | `.opencode/skills/skill-authoring/` | [Agent Skills](https://agentskills.io/home) progressive-disclosure spec, OpenCode V2 layout, and `skills-ref` validation |
 | `.opencode/skills/naming-files/` | Concise lowercase hyphenated file and date-prefix naming rules |
 | `.opencode/skills/naming-directories/` | Concise lowercase hyphenated directory, hierarchy, and `.tmp` naming rules |
@@ -72,7 +73,15 @@ OpenCode's `opencode plugin update` skips full-commit pins. Moving the pin in th
 
 ## Starting a New Project Repo With Extra MCPs or Plugins
 
-Once `opencode-defaults` is installed globally on a machine or container, every repo automatically inherits `superpowers`, `context7`, your model defaults, and global skills. You do **not** copy files from `opencode-defaults` into new repositories.
+Once `opencode-defaults` is installed globally on a machine or container, every repo automatically inherits `superpowers`, `context7`, your model defaults, and global skills (including [`project-setup`](.opencode/skills/project-setup/SKILL.md)). Installing the `opencode` V2 runtime executable is separate from applying `opencode-defaults`: bootstrap `opencode` first when an environment does not have it yet, then run `install.ps1` / `install.sh`. You do **not** copy files from `opencode-defaults` into new repositories.
+
+Example prompt to bootstrap a project with your conditional tooling preferences:
+
+```text
+Set up a new repo to build a website using opencode-defaults to define the base OpenCode harness installation.
+```
+
+`project-setup` reuses or installs the shared base, evaluates [`preferred-devtools.md`](.opencode/skills/project-setup/references/preferred-devtools.md) against the project's actual needs (rather than installing every listed tool indiscriminately), and reports selection, config, runtime connection, and account sign-in separately. See [`docs/project-setup-design.md`](docs/project-setup-design.md) for the design specification and Halo/Docker browser boundary.
 
 When starting a new repo (for example, a website repo `xyz` that needs extra MCP servers `abc` and `def`), declare **only** the project-specific additions in `xyz/opencode.json`:
 
@@ -96,6 +105,23 @@ When starting a new repo (for example, a website repo `xyz` that needs extra MCP
 
 (Or run `opencode mcp add abc --url ...` from inside `xyz`.) OpenCode V2 merges `~/.config/opencode/opencode.json` + `xyz/opencode.json` at runtime, so `xyz` gets `superpowers` + `context7` + `abc` + `def` while all other workspaces remain lean.
 
+### Optional Workstation Browser MCP (`chrome-devtools`)
+
+`chrome-devtools` is kept out of `global/opencode.json` because `--autoConnect` requires a local desktop Chrome session and does not apply to headless Halo/Docker containers (`ops-infra` provisions container browser services separately via `--browser-url={env:CHROME_CDP_URL}`). Configure it once per desktop workstation in `~/.config/opencode/opencode.json`; `install.py` preserves machine-local `mcp.servers` entries on future updates.
+
+1. Ensure **Google Chrome 144+** and **Node.js LTS** (`winget install --id OpenJS.NodeJS.LTS --exact` on Windows) are installed.
+2. Start Chrome, open `chrome://inspect/#remote-debugging`, and enable remote debugging on the profile used for project/dashboard work.
+3. Register the pinned MCP server globally on that workstation:
+   - **Windows** (`cmd.exe /d /c` runs `npx.cmd` reliably under stdio; explicit `Path` lets an already-running OpenCode background service find a freshly installed Node.js without restarting):
+     ```powershell
+     opencode mcp add chrome-devtools --global --env "Path=C:\Program Files\nodejs;{env:PATH}" -- cmd.exe /d /c npx -y chrome-devtools-mcp@1.12.0 --autoConnect
+     ```
+   - **Linux / macOS desktop:**
+     ```sh
+     opencode mcp add chrome-devtools --global -- npx -y chrome-devtools-mcp@1.12.0 --autoConnect
+     ```
+4. Verify `opencode mcp list` shows `chrome-devtools connected`, run a read-only browser check (`list_pages`), and click **Allow** on Chrome's connection prompt. Sign in to web dashboards manually in that Chrome profile; never store dashboard credentials in `opencode.json`.
+
 For repository settings on GitHub, keep **Pull requests** and **Allow squash merging** enabled (for optional review of larger or agent-generated changes with single-commit history) and turn off **Projects**, **Allow merge commits**, and **Allow rebase merging** unless a project specifically needs them.
 
 ## Validation
@@ -110,6 +136,7 @@ Validate each skill against the [Agent Skills specification](https://agentskills
 uv run --no-project --with "git+https://github.com/agentskills/agentskills.git#subdirectory=skills-ref" python -m skills_ref.cli validate .opencode/skills/writer
 uv run --no-project --with "git+https://github.com/agentskills/agentskills.git#subdirectory=skills-ref" python -m skills_ref.cli validate .opencode/skills/frontend-design
 uv run --no-project --with "git+https://github.com/agentskills/agentskills.git#subdirectory=skills-ref" python -m skills_ref.cli validate .opencode/skills/data-preferences
+uv run --no-project --with "git+https://github.com/agentskills/agentskills.git#subdirectory=skills-ref" python -m skills_ref.cli validate .opencode/skills/project-setup
 uv run --no-project --with "git+https://github.com/agentskills/agentskills.git#subdirectory=skills-ref" python -m skills_ref.cli validate .opencode/skills/skill-authoring
 uv run --no-project --with "git+https://github.com/agentskills/agentskills.git#subdirectory=skills-ref" python -m skills_ref.cli validate .opencode/skills/naming-files
 uv run --no-project --with "git+https://github.com/agentskills/agentskills.git#subdirectory=skills-ref" python -m skills_ref.cli validate .opencode/skills/naming-directories
