@@ -10,7 +10,7 @@
 
 **Spec:** [docs/baseline-verification-design.md](../../baseline-verification-design.md), plus the five amendments below. Task 1 writes them into the spec.
 
-**Revision:** Both requested reviews have been reconciled into this draft. Awaiting implementation approval. Commands and tests below are planned verification, not results.
+**Status:** Approved plan implemented; Windows/Linux acceptance completed on 2026-11-11. The steps below preserve the implementation plan, not an execution log. Actual acceptance and final-review regression results are recorded in [the design's Verified section](../../baseline-verification-design.md#verified).
 
 ## Review reconciliation
 
