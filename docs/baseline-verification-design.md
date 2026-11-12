@@ -167,3 +167,46 @@ Calls made while revising, confirmed with planning approval:
 - The runtime check looks on `PATH`, then in `~/.opencode/bin`.
 
 Three `/xm-spec-review` reports on 2026-11-11 led to the amendments above. Patrick accepted trimmed #1 (Local reporting at the first unowned boundary) and #2–#5 (ordered merge comparison, `project-setup` reading the exact version from `baseline.json`, Windows/Linux acceptance before rollout, and stopping before writes on an existing invalid receipt).
+
+## Verified
+
+### Windows and Linux acceptance — 2026-11-11
+
+Task 8 passed against committed source `b1e4af296d4598e0680e1822da4b17683393f58c`. The logs use UTC dates of 2026-11-12. Both platforms demonstrated a clean positive check followed by detection of one edited managed file; no Task 8 acceptance remains pending.
+
+| Identity | Verified value |
+|---|---|
+| Baseline fingerprint: Windows checkout, extracted Git archive, and Linux copy | `a77a2a838e31e785883a741616ded0140a5f21b3d09d3f744ea4007f6deebf1e` |
+| `FIXTURE_FINGERPRINT`, computed and asserted on both platforms | `83483d0562b62bc84626144a38495270e1dd0a0411350d3b5e1b2c8a29ec842d` |
+| Source archive SHA-256, identical before and after transfer to Linux | `86c93d80a2cffc24c8161f2b570fe535b6f8f3b5c07a44e4df50fcd4d8d4cc4b` |
+
+Windows used PowerShell `5.1.26100.9974`, Python `3.15.1`, and the existing `C:\Users\preid\.opencode\bin\opencode.exe`, which reported `opencode v2.2.7`. Linux SSH confirmed hostname `workspace-smoke`, user `builder`, Python `3.15.2`, and initially no OpenCode on `PATH` or in `/home/builder/.opencode/bin`.
+
+The unique Windows scratch directory (`W` below) was `C:\Users\preid\AppData\Local\Temp\opencode\baseline-verify-15f3829aaa6043a0b0231444240ac863.tmp`. The successful Linux scratch directory (`L`) was `/workspace/opencode-baseline-verify-tHxxuRHg.tmp`. `FP` denotes the baseline fingerprint above. Commands below abbreviate these paths; exact expanded arguments, working directories, exit codes, stdout and stderr are retained in the [local Task 8 evidence](../.superpowers/sdd/2026-11-11-baseline-verification/task-8-evidence/).
+
+| Platform / command | Exit | Actual result |
+|---|---:|---|
+| Windows: `git archive --format=tar -o W\src.tar HEAD`; `tar -xf W\src.tar -C W\src` | 0 each | Committed source extracted without Git metadata |
+| Windows: `uv run --no-project python W\src\install.py --fingerprint`; checkout `uv run --no-project python install.py --fingerprint` | 0 each | Both printed `FP` only |
+| Windows, archive source directory: `uv run --no-project python -m unittest discover -s tests -v` | 0 | 107 tests, `OK (skipped=9)`; symlink privileges unavailable, including two skipped subcases in the managed-symlink receipt test |
+| Windows: `powershell -NoProfile -ExecutionPolicy Bypass -File W\src\install.ps1 -Destination W\dest` | 0 | Isolated install |
+| Windows: same wrapper with `-Check -Expect FP -Destination W\dest` | 0 | Baseline, receipt, files, configuration and runtime all `ok`; `Local none`; `Result MATCH` |
+| Windows: `Add-Content -LiteralPath W\dest\skills\writer\SKILL.md -Value 'edit'`, then repeat the check | 0, then 1 | Sole finding: `Files edited skills/writer/SKILL.md`; `Local none`; `Result DRIFT, 1 findings` |
+| Linux, archive source directory: `python3 -m unittest discover -s tests -v` | 0 | 107 tests, `OK (skipped=3)`; only Windows PowerShell modes, wrapper and fallback tests skipped; all symlink cases executed and passed |
+| Linux: `sh L/src/install.sh --fingerprint` | 0 | Printed `FP` only |
+| Linux: `sh L/src/install.sh --destination L/dest` | 0 | Isolated install |
+| Linux: `sh L/src/install.sh --check --expect FP --destination L/dest` | 0 | Baseline, receipt, files, configuration and runtime all `ok`; `Local none`; `Result MATCH` |
+| Linux: `printf 'edit\n' >> L/dest/skills/writer/SKILL.md`, then repeat the check | 0, then 1 | Sole finding: `Files edited skills/writer/SKILL.md`; `Local none`; `Result DRIFT, 1 findings` |
+
+Linux commands ran through SSH, outside the unit suite, using `env -i` with `HOME=L/home`, `TMPDIR=L/tmp`, and `XDG_CONFIG_HOME`, `XDG_CACHE_HOME`, `XDG_DATA_HOME`, `XDG_STATE_HOME`, and `XDG_RUNTIME_DIR` under `L/xdg/`. `SHELL=/bin/bash`, `LANG=C.UTF-8`, and `PYTHONDONTWRITEBYTECODE=1` were also supplied. Preparation and unit tests used the original `PATH`; only runtime acceptance commands prepended `L/home/.opencode/bin`.
+
+Patrick's scoped verification permission was exercised by downloading `https://opencode.ai/v2/install` into `L/official-install.sh`, reviewing it, and running `bash L/official-install.sh --version 2.2.7 --no-modify-path` with that isolated environment. The installed binary reported `opencode v2.2.7`; its SHA-256 was `589253d36810f21217edd51545cd435b328cdc3cf4f451fbe0cce6f88afcf5e1`. The retained CLI log contains only the three `--version` invocations. No OpenCode authentication, provider or model calls were made.
+
+Two environment issues were diagnosed before the successful Linux run:
+
+- `scp` exited 255 because `/usr/lib/sftp-server` was absent. Transfer instead passed an open binary archive file directly to SSH stdin using Python `subprocess`, avoiding PowerShell 5.1 text pipelines. Matching archive hashes verified byte preservation.
+- The first unique scratch directory, `/tmp/opencode-baseline-verify-e76WOBHI.tmp`, was on a `noexec` mount. Its unit run exited 1 with 36 failure records and three Windows-only skips: fake runtime files had mode 755 but were not executable, so runtime discovery reported missing. Direct execution reproduced `EACCES`. Moving the unchanged archive and test scratch to the executable `/workspace` mount, with `TMPDIR` there too, resolved every failure. Production code and tests were not changed.
+
+Evidence, installed receipts/configuration, the edited skill fixtures, official installer script, runtime hash and CLI log were retained locally before cleanup. Both unique Linux directories and the unique Windows directory were then removed, with absence checks returning 0. The temporary CLI and its legacy shim were removed with the Linux scratch directory. Before/after snapshots confirmed the builder's original `PATH`, shell-profile hashes and OpenCode home/config/cache/data/state paths were unchanged; no CLI remained on the original `PATH` or in `/home/builder/.opencode/bin`.
+
+This completes the Windows/Linux acceptance gate. Rollout remains an `ops-infra` task. `sim-funds` and `sim-prime-broker` were not accessed; their recorded OpenCode 2.2.5 rollout is historical evidence, not a claim about their current state.
