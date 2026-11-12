@@ -19,7 +19,8 @@ Add review by a different model vendor at each stage of spec-driven work, for th
 
 - **Reviewers report and the author revises.** Review commands return findings and do not edit the artifact. The spec review ends with an explicit handoff requiring the authoring session to present scope recommendations and wait for the user's choices before editing.
 - **Spec review judges the build's value and size.** Astra identifies the core payoff, challenges unnecessary features and data fields, and recommends what to remove, shrink or defer. Essential gaps matter when they threaten the intended outcome. The report recommends a build boundary rather than assigning a generic readiness verdict. Unlike plan simplification, it may challenge the proposed requirements themselves.
-- **The two plan reviews run in parallel on one draft.** Each reports the plan and spec content hashes and ends by telling the parent to wait for the companion report, so both are reconciled in one revision.
+- **Planning preserves the approved scope.** Opus produces cohesive tasks, precise shared contracts and meaningful checks for a capable Astra executor. It carries forward exclusions and deferrals, justifies consequential implementation additions, and leaves routine coding choices open. The command overrides the generic `writing-plans` template's fixed review-case quota, exhaustive test-code prescriptions and execution-method menu.
+- **When both plan reviews are requested, they run on one unchanged draft.** Each reports the plan and spec content hashes and tells the parent to wait if its companion is running, so both are reconciled in one revision. A single requested review does not create a wait for an unrequested companion.
 - **High-volume work stays on OpenAI.** OpenAI usage draws on prepaid credits; Anthropic and Google are billed per call. Execution, `general` workers, `explore` and `title` run on OpenAI models, and Anthropic and Google handle the low-volume authoring and review stages.
 - **An omitted path is never guessed.** The restricted agents have no reliable way to read modification times, so a command without a path proceeds only when the Superpowers directory holds exactly one candidate.
 
@@ -52,6 +53,12 @@ Live runs used a scratch project with the harness installed into its `.opencode`
 - Local review session IDs: right-sized `ses_e32aadd7effev8oVAq2zQ3j5uY`; overbuilt `ses_e32aadd7fffe8bHwYj6fTrYonD`. The 11 installer tests also passed after the refinement.
 - Installed the command on the Surface through the standard installer and added the same command plus its `xm-reviewer` profile to `sim-funds` and `sim-prime-broker`. Those containers had OpenCode 2.2.5 but no existing global commands or reviewer profile. Their other settings and service files were preserved. The Halo host and `workspace-smoke` had no OpenCode installation.
 - All three installed command files matched SHA-256 `47a65e153563bfc6d1a07f4167b1847993cd8a5afb24eddd8eff293b9aeafdbf`. Live registries showed the new description and restricted child reviewer on the Surface and at both `/home/builder` and `/workspace` in each business container. Container verification covered installation and registration; the paid behavior checks ran on the Surface.
+
+### Plan writing refinement
+
+- A live `/xm-plan-write` run used an approved category-total CLI spec, a selected existing plan stub, and earlier conversation context proposing a database, extra fields, a dashboard and provider plugins. Opus revised only the selected plan, kept the superseded additions excluded, and produced one cohesive implementation task with concrete behavioral checks and no full test implementations.
+- Every assistant message used `anthropic/claude-opus-5-5#xhigh`; the session remained in `xm-planner`. It made no shell, subagent or question calls, labelled verification commands as planned checks, and stopped with the optional review commands and a fresh Astra Build-session handoff.
+- Session `ses_e328361dfffehih0s32b20qR8G` cost about $0.92. All 11 installer tests and `git diff --check` passed. This checks the revised prompt in isolation; it does not compare reasoning effort levels.
 
 ## Running the commands from a script
 

@@ -9,7 +9,7 @@ Lean, cross-platform OpenCode V2 base defaults for Windows PCs, Linux hosts (`am
 | `global/opencode.json` | Native OpenCode V2 model defaults and cross-model agent profiles, `superpowers` plugin, `context7` MCP, and optional `~/.config/opencode/AGENTS.local.md` |
 | `global/commands/*.md` | Five opt-in `/xm-*` cross-model planning and review commands installed into global `commands/` |
 | `global/AGENTS.md` | Short, OS-neutral global working and communication rules |
-| `.opencode/skills/writer/` | Concise, practical prose voice for emails, messages, and docs |
+| `.opencode/skills/writer/` | Concise, practical voice for emails and workplace/personal correspondence; use `@writer` explicitly for other prose |
 | `.opencode/skills/frontend-design/` | Visual UI design craft + `references/ui-preferences.md` for greenfield interfaces |
 | `.opencode/skills/data-preferences/` | Analytical data defaults: local/NAS first, Google Cloud / Google Drive when cloud storage is needed, raw CSV + Parquet + Polars + DuckDB |
 | `.opencode/skills/project-setup/` | New-repository bootstrapping & `opencode-defaults` adoption + `references/preferred-devtools.md` conditional tool register |
@@ -93,7 +93,7 @@ Use this for foundational specs and new codebases where extra independent review
 | Command | Model | Behavior |
 |---|---|---|
 | `/xm-spec-review <spec-path>` | GPT-6 Astra `xhigh` | Fresh reviewer judges scope and value, protects the core payoff, and recommends what to remove, shrink or defer |
-| `/xm-plan-write <spec-path>` | Claude Opus 5.5 `xhigh` | Current session writes a Superpowers plan from the approved spec |
+| `/xm-plan-write <spec-path>` | Claude Opus 5.5 `xhigh` | Current session writes a focused plan with clear task outcomes, shared contracts and checks, preserving the approved scope |
 | `/xm-plan-review <plan-path>` | Gemini 4 Carbon `high` | Fresh reviewer checks technical feasibility, spec coverage, interfaces and tests |
 | `/xm-plan-simplify <plan-path>` | GPT-6 Astra `xhigh` | Fresh reviewer proposes justified reductions in scope and complexity |
 | `/xm-code-review <plan-or-spec-path> [base-ref]` | Claude Fable 5.2 `high` | Fresh reviewer checks the branch and local changes against the requirements |
@@ -103,7 +103,7 @@ Use this for foundational specs and new codebases where extra independent review
 1. Select `anthropic/claude-fable-5-2#high` using `/models` and brainstorm the feature with Superpowers. Save its design under `docs/superpowers/specs/`.
 2. Run `/xm-spec-review <exact-spec-path>`. The authoring session presents the recommendations and waits for you to choose which scope changes to accept before editing the spec.
 3. Run `/xm-plan-write <exact-spec-path>` instead of replying "approved" to brainstorming (which would continue into planning on Fable). The command approves the spec for planning, not implementation. It loads `writing-plans` and saves the implementation plan under `docs/superpowers/plans/`.
-4. Submit `/xm-plan-review <exact-plan-path>` and `/xm-plan-simplify <exact-plan-path>` against the same unchanged draft. Both run in background child sessions and include plan/spec content hashes in their reports. Wait for **both**, confirm their paths and hashes match, then reconcile them in one revision. If either input changed, rerun the stale review against the current draft first. Each report carries this hold instruction for the parent session.
+4. For both perspectives, submit `/xm-plan-review <exact-plan-path>` and `/xm-plan-simplify <exact-plan-path>` against the same unchanged plan and spec. Both run in background child sessions and include plan/spec content hashes in their reports. When both are requested, wait for **both**, confirm their paths and hashes match, then reconcile them in one revision. If either input changed, rerun the stale review against the current draft first. Each report carries this hold instruction for the parent session. Reviews are opt-in; requesting only one does not require waiting for its companion.
 5. Approve the revised plan. Start a fresh Build session, select `openai/gpt-6-astra#high`, and ask it to execute the plan using `subagent-driven-development`, giving it the plan and spec paths. Unoverridden `general` workers also use Astra `high`.
 6. Before merging, run `/xm-code-review <exact-plan-path> <base-ref-or-SHA>`. The reviewer inspects committed, staged, unstaged and relevant untracked changes. Give an explicit starting SHA when working directly on main/master; the command will not interpret an empty branch comparison as approval. Resolve findings in the implementation session.
 
@@ -115,7 +115,9 @@ The four review commands use `xm-reviewer`, a child-only agent with file edits a
 
 `xm-plan-write` uses `xm-planner`, a primary agent that can edit only `docs/superpowers/plans/*.md`; shell commands and delegation are disabled. This allows repository plan writing that the built-in Plan agent would block. Run it from the repository root. For another plan directory, add a project-local `agents.xm-planner.permissions` edit rule for that path. The command pins Opus for its invocation; check the session model before later revision turns and reselect Opus if needed. The session remains in `xm-planner`; switch back to Build before editing a spec, committing, or implementing.
 
-The plan and code commands include simulation/evaluation questions where relevant: independent actor state, virtual-time causality, reproducibility and separation of hidden evaluation truth from observations. The spec review weighs domain-specific concerns by their effect on value and scope, without a fixed simulation checklist.
+The planner preserves approved exclusions and deferrals, justifies consequential implementation additions, and leaves routine coding choices to Astra. It uses the `writing-plans` structure with explicit overrides for proportional detail, no fixed review-case quota and the cross-model handoff. Verification commands in a plan are proposed checks, not executed test evidence.
+
+The plan and code reviewers include simulation/evaluation questions where relevant: independent actor state, virtual-time causality, reproducibility and separation of hidden evaluation truth from observations. Plan writing carries forward the approved spec's domain constraints without a fixed domain checklist. The spec review weighs domain-specific concerns by their effect on value and scope.
 
 Connect Anthropic, OpenAI and Google on each workstation/container using the workflow. Config reloads automatically; `/reload` forces a refresh. Check resolved agents with `opencode api get /api/agent` and command registrations with `opencode api get /api/command`. For a specific project, append `?location[directory]=<URL-encoded-absolute-project-path>`; the API's default location may be your home directory rather than the shell's cwd. A configured model still needs working provider access. Commands are prompt templates, not an enforced orchestration engine; use the TUI rather than assuming `opencode run "/xm-..."` executes a command. See [V2 commands](https://opencode.ai/docs/commands/).
 
