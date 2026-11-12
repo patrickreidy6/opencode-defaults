@@ -640,7 +640,10 @@ class ReceiptTests(unittest.TestCase):
         self.symlink(self.destination / "parent", self.root / "source", directory=True)
         self.assertTrue(hasattr(install, "verify_installed"), "verify_installed interface is missing")
         self.assertEqual(
-            install.verify_installed(self.destination, {"link": "a" * 64, "parent/global/AGENTS.md": "a" * 64}),
+            install.verify_installed(self.destination, {
+                "link": hashlib.sha256(b"abc").hexdigest(),
+                "parent/global/AGENTS.md": hashlib.sha256(DEFAULT_SOURCE["global/AGENTS.md"]).hexdigest(),
+            }),
             ["link", "parent/global/AGENTS.md"],
         )
 
@@ -784,6 +787,29 @@ class RetirementTests(unittest.TestCase):
         self.assertEqual(self.read_config()["agents"]["old"], {})
         for path in ("agents.old", "plugins", "mcp.servers.old"):
             self.assertNotIn(path, output)
+
+    def test_kept_notices_exclude_children_replaced_by_active_server(self) -> None:
+        source_config = self.source_a / "global/opencode.json"
+        config = json.loads(source_config.read_bytes())
+        config["mcp"]["servers"]["context7"]["headers"] = {"Authorization": "original"}
+        source_config.write_text(json.dumps(config), encoding="utf-8")
+        self.install_source(self.source_a)
+        current = self.read_config()
+        current["mcp"]["servers"]["context7"]["headers"]["Authorization"] = "SECRET_EDIT"
+        current["agents"]["old"]["model"] = "SECRET_KEPT"
+        self.write_config(current)
+        before = snapshot(self.destination)
+        preview = self.install_source(self.source_b, dry_run=True)
+        self.assertEqual(snapshot(self.destination), before)
+        output = self.install_source(self.source_b)
+        self.assertEqual(self.read_config()["mcp"]["servers"]["context7"], {
+            "type": "remote", "url": "https://mcp.context7.com/mcp",
+        })
+        self.assertEqual(self.read_config()["agents"]["old"]["model"], "SECRET_KEPT")
+        for text in (preview, output):
+            self.assertNotIn("Kept locally changed retired setting: mcp.servers.context7", text)
+            self.assertIn("Kept locally changed retired setting: agents.old.model", text)
+            self.assertNotIn("SECRET_", text)
 
     def test_retired_server_with_nested_type_change_is_kept(self) -> None:
         cases = (
@@ -1049,6 +1075,449 @@ class RetirementTests(unittest.TestCase):
         with self.assertRaises(install.InstallError):
             install.plan_file_retirement(self.destination, receipt, set())
         self.assertEqual(snapshot(self.destination), before)
+
+
+class InstalledFixture(unittest.TestCase):
+    def setUp(self) -> None:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.source = make_source(self.root / "source")
+        self.destination = self.root / "destination"
+        self.env = cli_env(self.root, "2.2.7")
+        self.install_source()
+
+    def install_source(self) -> None:
+        result = run_installer(self.source, "--destination", str(self.destination), env=self.env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def read_config(self) -> dict:
+        return json.loads((self.destination / "opencode.json").read_bytes())
+
+    def write_config(self, config: dict) -> None:
+        (self.destination / "opencode.json").write_text(json.dumps(config), encoding="utf-8")
+
+    def check(self, *args: str, expected: int = 0) -> str:
+        result = run_installer(
+            self.source, "--destination", str(self.destination), "--check", *args, env=self.env,
+        )
+        self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
+        self.assertEqual(result.stderr, "")
+        return result.stdout
+
+    def check_in_process(self) -> tuple[int, str]:
+        self.assertTrue(hasattr(install, "run_check"), "run_check interface is missing")
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with mock.patch.dict(os.environ, self.env, clear=True), \
+                contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            code = install.run_check(self.source, self.destination, None)
+        self.assertEqual(stderr.getvalue(), "")
+        return code, stdout.getvalue()
+
+    def symlink(self, link: Path, target: Path, *, directory: bool = False) -> None:
+        try:
+            link.symlink_to(target, target_is_directory=directory)
+        except (OSError, NotImplementedError) as exc:
+            self.skipTest(f"Symlinks unavailable: {type(exc).__name__}")
+
+    def add_local(self) -> None:
+        cfg = self.read_config()
+        cfg["plugins"].append("SECRET_LOCAL_PLUGIN")
+        cfg["providers"] = {"local": {"apiKey": "SECRET_KEY"}}
+        cfg["mcp"]["servers"]["local"] = {"command": ["SECRET_COMMAND"]}
+        self.write_config(cfg)
+        (self.destination / "commands/mine.md").write_bytes(b"SECRET_CONTENT\n")
+
+
+class CheckTests(InstalledFixture):
+    def test_check_passes_after_install(self) -> None:
+        output = self.check()
+        self.assertEqual(section(output, "Result"), ["Result MATCH"])
+        self.assertEqual(section(output, "Baseline"), [f"Baseline {FIXTURE_FINGERPRINT}", "Baseline ok"])
+        for name in ("Receipt", "Files", "Config", "Runtime"):
+            self.assertEqual(section(output, name), [f"{name} ok"])
+        self.assertIn(install.CHECK_SCOPE_NOTE, output)
+        names = [line.split()[0] for line in output.splitlines()[:-1]]
+        self.assertEqual(list(dict.fromkeys(names)), [
+            "Destination", "Baseline", "Receipt", "Files", "Config", "Runtime", "Local", "Result",
+        ])
+        for name in set(names):
+            self.assertEqual(section(output, name), sorted(section(output, name)))
+
+    def test_expect_match_mismatch_and_pasted_value(self) -> None:
+        self.check("--expect", FIXTURE_FINGERPRINT)
+        self.check("--expect", f"  {FIXTURE_FINGERPRINT.upper()}  ")
+        output = self.check("--expect", "0" * 64, expected=1)
+        self.assertIn("Baseline mismatch", output)
+        self.assertEqual(section(output, "Result"), ["Result DRIFT, 1 findings"])
+
+    def test_receipt_findings(self) -> None:
+        path = self.destination / install.RECEIPT_NAME
+        original = path.read_bytes()
+        for content, finding in ((None, "missing"), (b"not json SECRET_RECEIPT", "invalid")):
+            with self.subTest(finding=finding):
+                if content is None:
+                    path.unlink()
+                else:
+                    path.write_bytes(content)
+                output = self.check(expected=1)
+                self.assertEqual(section(output, "Receipt"), [f"Receipt {finding}"])
+                for name in ("Files", "Config", "Runtime"):
+                    self.assertEqual(section(output, name), [f"{name} ok"])
+                self.assertNotIn("SECRET_RECEIPT", output)
+        path.write_bytes(original)
+        (self.source / "global/commands/xm-demo.md").write_bytes(b"New baseline\n")
+        output = self.check(expected=1)
+        self.assertIn("Receipt differs", output)
+        self.assertIn("Files edited commands/xm-demo.md", output)
+
+    def test_receipt_compares_all_metadata_with_same_fingerprint(self) -> None:
+        path = self.destination / install.RECEIPT_NAME
+        original = json.loads(path.read_bytes())
+        for field, value in (("files", {"AGENTS.md": "0" * 64}), ("config", {"private": "SECRET_CONFIG"})):
+            with self.subTest(field=field):
+                path.write_text(json.dumps({**original, field: value}), encoding="utf-8")
+                output = self.check(expected=1)
+                self.assertEqual(section(output, "Receipt"), ["Receipt differs"])
+                self.assertEqual(section(output, "Files"), ["Files ok"])
+                self.assertEqual(section(output, "Config"), ["Config ok"])
+                self.assertNotIn("SECRET_CONFIG", output)
+
+    def test_file_findings(self) -> None:
+        (self.destination / "commands/xm-demo.md").unlink()
+        (self.destination / "skills/demo/SKILL.md").write_bytes(b"SECRET_EDIT")
+        output = self.check(expected=1)
+        self.assertEqual(section(output, "Files"), [
+            "Files edited skills/demo/SKILL.md", "Files missing commands/xm-demo.md",
+        ])
+        self.assertEqual(section(output, "Result"), ["Result DRIFT, 2 findings"])
+        self.assertNotIn("SECRET_EDIT", output)
+        (self.destination / "commands/xm-demo.md").mkdir()
+        self.assertIn("Files invalid commands/xm-demo.md", self.check(expected=1))
+
+    def test_file_read_error_is_unreadable(self) -> None:
+        original = Path.read_bytes
+
+        def denied(path):
+            if path == self.destination / "commands/xm-demo.md":
+                raise PermissionError("SECRET_ERROR")
+            return original(path)
+
+        with mock.patch.object(Path, "read_bytes", denied):
+            code, output = self.check_in_process()
+        self.assertEqual(code, 1)
+        self.assertIn("Files unreadable commands/xm-demo.md", output)
+        self.assertNotIn("SECRET_ERROR", output)
+
+    def test_managed_symlink_and_parent_are_invalid_not_followed(self) -> None:
+        target = self.destination / "commands/xm-demo.md"
+        target.unlink()
+        self.symlink(target, self.source / "global/commands/xm-demo.md")
+        output = self.check(expected=1)
+        self.assertIn("Files invalid commands/xm-demo.md", output)
+        self.assertNotIn("Local commands/xm-demo.md", output)
+        target.unlink()
+        target.parent.rmdir()
+        self.symlink(target.parent, self.source / "global/commands", directory=True)
+        output = self.check(expected=1)
+        self.assertIn("Files invalid commands/xm-demo.md", output)
+        self.assertIn("Local commands\n", output)
+
+    def test_looping_managed_symlink_is_invalid(self) -> None:
+        path = self.destination / "commands/xm-demo.md"
+        path.unlink()
+        self.symlink(path, path)
+        self.assertIn("Files invalid commands/xm-demo.md", self.check(expected=1))
+
+    def test_config_drift_cases(self) -> None:
+        original = self.read_config()
+        cases = {
+            "model": lambda cfg: cfg.update(model="SECRET_MODEL"),
+            "altered-server": lambda cfg: cfg["mcp"]["servers"]["context7"].update(url="SECRET_URL"),
+            "removed-server": lambda cfg: cfg["mcp"]["servers"].pop("context7"),
+            "small_model": lambda cfg: cfg.update(small_model="SECRET_SMALL"),
+            "instructions": lambda cfg: cfg.update(instructions=[]),
+            "plugins": lambda cfg: cfg["plugins"].insert(0, "SECRET_PLUGIN"),
+            "wrong-type": lambda cfg: cfg.update(plugins={"private": "SECRET_TYPE"}),
+        }
+        for name, change in cases.items():
+            with self.subTest(case=name):
+                cfg = copy.deepcopy(original)
+                change(cfg)
+                self.write_config(cfg)
+                output = self.check(expected=1)
+                path = "mcp.servers.context7" if name.endswith("server") else "plugins" if name == "wrong-type" else name
+                self.assertEqual(section(output, "Config"), [f"Config differs {path}"])
+                self.assertNotIn("SECRET_", output)
+
+    def test_second_superpowers_ref_is_drift(self) -> None:
+        cfg = self.read_config()
+        cfg["plugins"] = [install.SUPERPOWERS_PACKAGE + "#pinned"]
+        (self.source / "global/opencode.json").write_text(json.dumps(cfg), encoding="utf-8")
+        self.install_source()
+        cfg["plugins"].append(install.SUPERPOWERS_PACKAGE + "#local")
+        self.write_config(cfg)
+        self.assertEqual(section(self.check(expected=1), "Config"), ["Config differs plugins"])
+
+    def test_reorder_is_fixed_by_reinstall(self) -> None:
+        cfg = self.read_config()
+        cfg["skills"] = ["managed-skill"]
+        (self.source / "global/opencode.json").write_text(json.dumps(cfg), encoding="utf-8")
+        self.install_source()
+        for key in ("plugins", "instructions", "skills"):
+            with self.subTest(key=key):
+                current = self.read_config()
+                current[key].insert(0, "SECRET_LOCAL")
+                self.write_config(current)
+                self.assertEqual(section(self.check(expected=1), "Config"), [f"Config differs {key}"])
+                self.install_source()
+                self.check()
+                self.assertEqual(self.read_config()[key], cfg[key] + ["SECRET_LOCAL"])
+
+    def test_properly_placed_local_additions_pass(self) -> None:
+        self.add_local()
+        output = self.check()
+        self.assertEqual(section(output, "Result"), ["Result MATCH"])
+        self.assertNotIn("SECRET_", output)
+
+    def test_pass_implies_reinstall_changes_nothing(self) -> None:
+        self.add_local()
+        self.check()
+        files = ["AGENTS.md", "commands/xm-demo.md", "skills/demo/SKILL.md", install.RECEIPT_NAME]
+        before = {rel: (self.destination / rel).read_bytes() for rel in files}
+        config = self.read_config()
+        self.install_source()
+        self.assertEqual({rel: (self.destination / rel).read_bytes() for rel in files}, before)
+        self.assertEqual(self.read_config(), config)
+
+    def test_opencode_jsonc_is_a_finding(self) -> None:
+        (self.destination / "opencode.jsonc").write_bytes(b"SECRET_JSONC")
+        before = snapshot(self.destination)
+        output = self.check(expected=1)
+        self.assertEqual(section(output, "Config"), ["Config present opencode.jsonc"])
+        self.assertNotIn("SECRET_JSONC", output)
+        self.assertEqual(snapshot(self.destination), before)
+
+    def test_runtime_findings(self) -> None:
+        cases = [
+            (None, {}, "Runtime missing"),
+            ("2.2.5", {}, "Runtime mismatch 2.2.5 (baseline 2.2.7)"),
+            ("2.2.7", {"exit_code": 3, "output": "SECRET_FAILURE"}, "Runtime failed"),
+            *[("2.2.7", {"output": value}, "Runtime failed") for value in ("", "   ", "v")],
+            *[("2.2.7", {"output": value}, "Runtime ok") for value in (
+                "2.2.7", "opencode v2.2.7\r\n", "OpenCode CLI version v2.2.7",
+            )],
+            ("2.2.7", {"in_home": True}, "Runtime ok"),
+        ]
+        for index, (version, kwargs, finding) in enumerate(cases):
+            with self.subTest(version=version, kwargs=kwargs):
+                self.env = cli_env(self.root / str(index), version, **kwargs)
+                output = self.check(expected=0 if finding == "Runtime ok" else 1)
+                self.assertEqual(section(output, "Runtime"), [finding])
+                self.assertNotIn("SECRET_FAILURE", output)
+
+    def test_failing_path_cli_does_not_fall_back_home(self) -> None:
+        cli_env(self.root, "2.2.7", in_home=True)
+        self.env = cli_env(self.root, "2.2.7", exit_code=3)
+        self.assertEqual(section(self.check(expected=1), "Runtime"), ["Runtime failed"])
+
+    def test_probe_exceptions_are_failed_without_raw_output(self) -> None:
+        self.assertTrue(hasattr(install, "probe_opencode_version"), "probe interface is missing")
+        for error in (subprocess.TimeoutExpired("SECRET_COMMAND", 0.1, output="SECRET_OUT", stderr="SECRET_ERR"),
+                      OSError("SECRET_ERROR")):
+            with self.subTest(error=type(error).__name__):
+                output = io.StringIO()
+                with mock.patch.dict(os.environ, self.env, clear=True), \
+                        mock.patch("install.subprocess.run", side_effect=error), \
+                        contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
+                    self.assertEqual(install.probe_opencode_version(timeout=0.1), ("failed", ""))
+                self.assertEqual(output.getvalue(), "")
+
+    def test_check_on_missing_destination(self) -> None:
+        self.destination = self.root / "missing/target"
+        output = self.check(expected=1)
+        self.assertIn("Config missing opencode.json", output)
+        self.assertIn("Receipt missing", output)
+        self.assertFalse(self.destination.parent.exists())
+
+    def test_bom_invalid_and_non_object_config(self) -> None:
+        path = self.destination / "opencode.json"
+        path.write_bytes(b"\xef\xbb\xbf" + path.read_bytes())
+        self.check()
+        for content in (b'{"SECRET_CONFIG":', b'[]', b'\xff', b'{"private": NaN}'):
+            with self.subTest(content=content):
+                path.write_bytes(content)
+                output = self.check(expected=1)
+                self.assertEqual(section(output, "Config"), ["Config unreadable opencode.json"])
+                self.assertNotIn("SECRET_CONFIG", output)
+
+    def test_bad_baseline_check_could_not_complete(self) -> None:
+        (self.source / "baseline.json").unlink()
+        output = self.check(expected=1)
+        self.assertIn("baseline.json", output)
+        self.assertIn("Result could not complete", output)
+        self.assertNotIn("Local none", output)
+
+    def test_check_is_read_only(self) -> None:
+        self.add_local()
+        (self.destination / "commands/xm-demo.md").write_bytes(b"drift")
+        before = snapshot(self.root)
+        directories = {p: p.stat().st_mtime_ns for p in self.root.rglob("*") if p.is_dir()}
+        self.check(expected=1)
+        self.assertEqual(snapshot(self.root), before)
+        self.assertEqual({p: p.stat().st_mtime_ns for p in self.root.rglob("*") if p.is_dir()}, directories)
+
+    def test_local_scan_failure_is_not_local_none(self) -> None:
+        original = Path.iterdir
+
+        def denied(path):
+            if path == self.destination / "commands":
+                raise PermissionError("SECRET_ENUMERATION")
+            return original(path)
+
+        with mock.patch.object(Path, "iterdir", denied):
+            code, output = self.check_in_process()
+        self.assertEqual(code, 1)
+        self.assertIn("commands", output)
+        self.assertIn("Result could not complete", output)
+        self.assertNotIn("Local none", output)
+        self.assertNotIn("SECRET_ENUMERATION", output)
+
+    def test_check_uses_default_destination(self) -> None:
+        self.env["XDG_CONFIG_HOME"] = str(self.root / "xdg")
+        result = run_installer(self.source, env=self.env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        result = run_installer(self.source, "--check", env=self.env)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(str(self.root / "xdg/opencode"), result.stdout)
+
+    def test_check_usage_errors(self) -> None:
+        for args in (("--expect", FIXTURE_FINGERPRINT), ("--check", "--dry-run"), ("--check", "--fingerprint"),
+                     *[("--check", "--expect", value) for value in ("nothex", "", "   ")],
+                     ("--expect", "")):
+            with self.subTest(args=args):
+                before = snapshot(self.destination)
+                result = run_installer(self.source, *args, "--destination", str(self.destination), env=self.env)
+                self.assertEqual(result.returncode, 2)
+                self.assertIn("usage:", result.stderr)
+                self.assertEqual(result.stdout, "")
+                self.assertEqual(snapshot(self.destination), before)
+        self.assertTrue(hasattr(install, "run_check"), "run_check interface is missing")
+        with mock.patch("install.run_check", side_effect=AssertionError("must validate before checking")), \
+                mock.patch("install.default_destination", side_effect=AssertionError("must validate before resolving")), \
+                contextlib.redirect_stderr(io.StringIO()):
+            for value in ("", "   "):
+                with self.assertRaises(SystemExit) as raised:
+                    install.main(["--check", "--expect", value])
+                self.assertEqual(raised.exception.code, 2)
+
+    def test_config_drift_paths_atomic_servers_and_ordered_lists(self) -> None:
+        self.assertTrue(hasattr(install, "config_drift_paths"), "config_drift_paths interface is missing")
+        self.assertEqual(install.config_drift_paths(
+            {"z": [2, 1], "a": {"kept": 1, "gone": 2}, "mcp": {"servers": {"server": {"url": "old"}}}},
+            {"z": [1, 2], "a": {"kept": 1, "new": 2}, "mcp": {"servers": {"server": {"url": "new"}}}},
+        ), ["a.gone", "a.new", "mcp.servers.server", "z"])
+
+
+class LocalTests(InstalledFixture):
+    def test_config_reported_at_first_boundary(self) -> None:
+        cfg = self.read_config()
+        cfg["providers"] = {"openrouter": {"settings": {"apiKey": "secret-value"}}}
+        cfg["mcp"]["servers"]["chrome-devtools"] = {"command": ["secret-value"]}
+        cfg["agents"]["title"]["temperature"] = 0.5
+        cfg["plugins"].append("secret-value")
+        self.write_config(cfg)
+        output = self.check()
+        self.assertEqual(section(output, "Local"), [
+            "Local agents.title.temperature", "Local mcp.servers.chrome-devtools",
+            "Local plugins (+1)", "Local providers",
+        ])
+        self.assertNotIn("secret-value", output)
+
+    def test_absent_root_skills_list_and_object_plugin(self) -> None:
+        cfg = self.read_config()
+        cfg["skills"] = ["~/extra"]
+        cfg["plugins"].append({"package": "local-plugin", "options": {"private": "secret"}})
+        self.write_config(cfg)
+        output = self.check()
+        self.assertEqual(section(output, "Local"), ["Local plugins (+1)", "Local skills (+1)"])
+        for value in ("~/extra", "local-plugin", "private", "secret"):
+            self.assertNotIn(value, output)
+        cfg["skills"] = []
+        self.write_config(cfg)
+        self.assertEqual(section(self.check(), "Local"), ["Local plugins (+1)"])
+
+    def test_files_and_folders(self) -> None:
+        files = ["commands/add-notes.md", "skills/custom-skill/SKILL.md", "skills/custom-skill/ref.md",
+                 "plugins/x.ts", "AGENTS.local.md", "backups/old.txt", "service.json", "other.txt",
+                 "skills/demo/references/local.md"]
+        for rel in files:
+            path = self.destination / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"SECRET_FILE")
+        output = self.check()
+        self.assertEqual(section(output, "Local"), [
+            "Local AGENTS.local.md", "Local commands/add-notes.md", "Local plugins/x.ts",
+            "Local skills/custom-skill/", "Local skills/demo/references/",
+        ])
+        self.assertNotIn("SECRET_FILE", output)
+
+    def test_clean_install_prints_local_none(self) -> None:
+        self.assertEqual(section(self.check(), "Local"), ["Local none"])
+        for rel in ("agents", "plugins", "skills/empty"):
+            (self.destination / rel).mkdir()
+        self.assertEqual(section(self.check(), "Local"), ["Local none"])
+
+    def test_unowned_directory_is_not_recursively_classified(self) -> None:
+        unowned = self.destination / "skills/custom"
+        (unowned / "nested/deeper").mkdir(parents=True)
+        original = Path.iterdir
+
+        def bounded(path):
+            if path.is_relative_to(unowned) and path != unowned:
+                raise AssertionError("must not enumerate inside unowned subtree")
+            return original(path)
+
+        with mock.patch.object(Path, "iterdir", bounded), \
+                mock.patch.object(Path, "rglob", side_effect=AssertionError("must not recursively enumerate")):
+            # Direct reporting avoids source collection's intentionally recursive managed-skill scan.
+            self.assertTrue(hasattr(install, "list_local_additions"), "Local interface is missing")
+            self.assertEqual(install.list_local_additions(
+                self.destination, None, {}, {"AGENTS.md", "commands/xm-demo.md", "skills/demo/SKILL.md"},
+            ), ["skills/custom/"])
+
+    def test_symlinked_directory_listed_not_followed(self) -> None:
+        self.symlink(self.destination / "skills/loop", self.destination / "skills", directory=True)
+        self.symlink(self.destination / "commands/broken", self.root / "missing")
+        self.symlink(self.destination / "AGENTS.local.md", self.root / "missing")
+        self.assertEqual(section(self.check(), "Local"), [
+            "Local AGENTS.local.md", "Local commands/broken", "Local skills/loop",
+        ])
+
+    def test_symlink_replacing_unmanaged_scan_root(self) -> None:
+        self.symlink(self.destination / "plugins", self.source, directory=True)
+        self.assertEqual(section(self.check(), "Local"), ["Local plugins"])
+
+    def test_owned_server_children_are_not_local(self) -> None:
+        cfg = self.read_config()
+        cfg["mcp"]["servers"]["context7"]["headers"] = {"Authorization": "secret"}
+        self.write_config(cfg)
+        output = self.check(expected=1)
+        self.assertEqual(section(output, "Config"), ["Config differs mcp.servers.context7"])
+        self.assertEqual(section(output, "Local"), ["Local none"])
+        self.assertNotIn("secret", output)
+
+    def test_kept_retired_file_shows_as_local(self) -> None:
+        old_source = make_source(self.root / "old-source", {
+            **DEFAULT_SOURCE, "global/commands/xm-old.md": b"old\n",
+        })
+        result = run_installer(old_source, "--destination", str(self.destination), env=self.env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        (self.destination / "commands/xm-old.md").write_bytes(b"SECRET_EDIT")
+        self.install_source()
+        output = self.check()
+        self.assertEqual(section(output, "Local"), ["Local commands/xm-old.md"])
+        self.assertNotIn("SECRET_EDIT", output)
 
 
 if __name__ == "__main__":

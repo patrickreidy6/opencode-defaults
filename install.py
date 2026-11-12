@@ -11,16 +11,19 @@ import os
 import re
 import shutil
 import stat
+import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 BASELINE_FILE = "baseline.json"
 RECEIPT_NAME = "opencode-defaults-receipt.json"
 RECEIPT_FORMAT = 1
+CHECK_SCOPE_NOTE = "Covers the installed global baseline and CLI version only; the running server version, project or system overrides, environment substitutions, plugin loading, MCP connectivity, provider access and model behavior are not checked. Detects accidental drift only (not tamper-proof)."
+LOCAL_SCAN_DIRS = ("agents", "commands", "skills", "plugins")
 SKIP_PARTS = {"__pycache__", "node_modules", ".venv", ".git"}
 SKIP_SUFFIXES = {".pyc", ".pyo", ".pyd"}
 PR4_AGENTS_HEADER = "# Personal OpenCode Defaults"
@@ -250,7 +253,7 @@ def reject_json_constant(value: str) -> Any:
     raise ValueError("non-finite numbers are not valid JSON")
 
 
-def path_state(destination: Path, rel: str) -> os.stat_result | None:
+def path_state(destination: Path, rel: str, *, allow_leaf_link: bool = False) -> os.stat_result | None:
     """Inspect a canonical relative path without traversing links or junctions."""
     if (
         not isinstance(rel, str)
@@ -269,6 +272,8 @@ def path_state(destination: Path, rel: str) -> os.stat_result | None:
             state = None
             break
         if stat.S_ISLNK(state.st_mode) or getattr(state, "st_reparse_tag", 0) == 0xA0000003:
+            if allow_leaf_link and index == len(parts):
+                return state
             raise ValueError("symlinks and directory junctions are not allowed")
         if index < len(parts):
             if not stat.S_ISDIR(state.st_mode):
@@ -379,6 +384,191 @@ def read_config(path: Path) -> dict[str, Any]:
     return config
 
 
+def probe_opencode_version(timeout: float = 10.0) -> tuple[Literal["ok", "missing", "failed"], str]:
+    executable = shutil.which("opencode") or shutil.which("opencode", path=str(Path.home() / ".opencode" / "bin"))
+    if executable is None:
+        return "missing", ""
+    try:
+        result = subprocess.run([executable, "--version"], capture_output=True, text=True, timeout=timeout, check=False)
+    except (OSError, subprocess.TimeoutExpired, UnicodeError):
+        return "failed", ""
+    words = result.stdout.split()
+    if result.returncode or not words:
+        return "failed", ""
+    version = words[-1].removeprefix("v")
+    return ("ok", version) if version else ("failed", "")
+
+
+def config_drift_paths(installed: dict[str, Any], expected: dict[str, Any]) -> list[str]:
+    differences: list[str] = []
+
+    def walk(current: dict[str, Any], wanted: dict[str, Any], path: tuple[str, ...]) -> None:
+        for key in current.keys() | wanted.keys():
+            child = (*path, key)
+            if key not in current or key not in wanted:
+                differences.append(".".join(child))
+            elif current[key] != wanted[key]:
+                if path != ("mcp", "servers") and isinstance(current[key], dict) and isinstance(wanted[key], dict):
+                    walk(current[key], wanted[key], child)
+                else:
+                    differences.append(".".join(child))
+
+    walk(installed, expected, ())
+    return sorted(differences)
+
+
+def list_local_additions(
+    destination: Path, installed_cfg: dict[str, Any] | None, baseline_cfg: dict[str, Any], managed: set[str]
+) -> list[str]:
+    additions: set[str] = set()
+
+    def config_walk(current: dict[str, Any], baseline: dict[str, Any], path: tuple[str, ...]) -> None:
+        for key, value in current.items():
+            child = (*path, key)
+            display = ".".join(child)
+            if not path and key in UNION_ROOT_LIST_KEYS and isinstance(value, list):
+                base_list = baseline.get(key, [])
+                if isinstance(base_list, list):
+                    count = sum(item not in base_list for item in value)
+                    if count:
+                        additions.add(f"{key} (+{count})")
+            elif key not in baseline:
+                additions.add(display)
+            elif path != ("mcp", "servers") and isinstance(value, dict) and isinstance(baseline[key], dict):
+                config_walk(value, baseline[key], child)
+
+    if installed_cfg is not None:
+        config_walk(installed_cfg, baseline_cfg, ())
+
+    prefixes = {rel[:index] for rel in managed for index, char in enumerate(rel) if char == "/"}
+
+    def file_walk(rel: str, *, container: bool = False) -> None:
+        if rel in managed:
+            return
+        target = destination / rel
+        try:
+            state = path_state(destination, rel, allow_leaf_link=True)
+            if state is None:
+                return
+            if stat.S_ISLNK(state.st_mode) or getattr(state, "st_reparse_tag", 0) == 0xA0000003:
+                additions.add(rel)
+            elif stat.S_ISDIR(state.st_mode):
+                if container or rel in prefixes:
+                    for child in target.iterdir():
+                        file_walk(f"{rel}/{child.name}")
+                elif next(target.iterdir(), None) is not None:
+                    additions.add(rel + "/")
+            else:
+                additions.add(rel)
+        except (OSError, ValueError, RuntimeError):
+            raise InstallError(f"{target}: unable to inspect local additions safely") from None
+
+    for root in LOCAL_SCAN_DIRS:
+        file_walk(root, container=True)
+    try:
+        if path_state(destination, "AGENTS.local.md", allow_leaf_link=True) is not None:
+            additions.add("AGENTS.local.md")
+    except (OSError, ValueError, RuntimeError):
+        raise InstallError(f"{destination / 'AGENTS.local.md'}: unable to inspect local additions safely") from None
+    return sorted(additions)
+
+
+def run_check(repo_root: Path, destination: Path, expect: str | None) -> int:
+    findings: dict[str, list[str]] = {name: [] for name in ("Destination", "Baseline", "Receipt", "Files", "Config", "Runtime")}
+    details = {"Destination": [str(destination)]}
+    active_path = repo_root / BASELINE_FILE
+    try:
+        pinned = load_baseline(repo_root)
+        active_path = repo_root / "global/opencode.json"
+        baseline_cfg = read_config(active_path)
+        files = managed_files(repo_root)
+        hashes = {}
+        for rel, source in files.items():
+            active_path = source
+            hashes[rel] = sha256_file(source)
+        active_path = repo_root
+        fingerprint = compute_fingerprint(repo_root)
+        details["Baseline"] = [fingerprint]
+        if expect is not None and expect != fingerprint:
+            findings["Baseline"].append("mismatch")
+
+        try:
+            path_state(destination, RECEIPT_NAME)
+            receipt = read_receipt(destination)
+            if receipt is None:
+                findings["Receipt"].append("missing")
+            elif receipt != Receipt(fingerprint, hashes, baseline_cfg):
+                findings["Receipt"].append("differs")
+        except (ReceiptError, OSError, ValueError, RuntimeError):
+            findings["Receipt"].append("invalid")
+
+        for rel, digest in hashes.items():
+            problem = None
+            try:
+                state = path_state(destination, rel)
+                if state is None:
+                    problem = "missing"
+                elif not stat.S_ISREG(state.st_mode):
+                    problem = "invalid"
+                elif sha256_file(destination / rel) != digest:
+                    problem = "edited"
+            except (ValueError, RuntimeError):
+                problem = "invalid"
+            except OSError:
+                problem = "unreadable"
+            if problem:
+                findings["Files"].append(f"{problem} {rel}")
+
+        installed_cfg = None
+        try:
+            state = path_state(destination, "opencode.json")
+            if state is None:
+                findings["Config"].append("missing opencode.json")
+            elif not stat.S_ISREG(state.st_mode):
+                findings["Config"].append("unreadable opencode.json")
+            else:
+                installed_cfg = read_config(destination / "opencode.json")
+        except (InstallError, OSError, ValueError, RuntimeError):
+            findings["Config"].append("unreadable opencode.json")
+        if installed_cfg is not None:
+            expected_cfg = merge_settings(installed_cfg, baseline_cfg)
+            findings["Config"].extend(f"differs {path}" for path in config_drift_paths(installed_cfg, expected_cfg))
+
+        active_path = destination / "opencode.jsonc"
+        if path_state(destination, "opencode.jsonc", allow_leaf_link=True) is not None:
+            findings["Config"].append("present opencode.jsonc")
+
+        active_path = destination
+        status, version = probe_opencode_version()
+        if status != "ok":
+            findings["Runtime"].append(status)
+        elif version != pinned:
+            findings["Runtime"].append(f"mismatch {version} (baseline {pinned})")
+        local = list_local_additions(destination, installed_cfg, baseline_cfg, set(files))
+    except (BaselineError, InstallError) as exc:
+        print(f"Destination {destination}")
+        print(f"Error: {exc}")
+        print("Result could not complete")
+        print(CHECK_SCOPE_NOTE)
+        return 1
+    except (OSError, ValueError, RuntimeError):
+        print(f"Destination {destination}")
+        print(f"Error: {active_path}: unable to inspect baseline or destination safely")
+        print("Result could not complete")
+        print(CHECK_SCOPE_NOTE)
+        return 1
+
+    for name, items in findings.items():
+        for item in sorted(details.get(name, []) + (items or ["ok"])):
+            print(f"{name} {item}")
+    for item in local or ["none"]:
+        print(f"Local {item}")
+    count = sum(len(items) for items in findings.values())
+    print(f"Result DRIFT, {count} findings" if count else "Result MATCH")
+    print(CHECK_SCOPE_NOTE)
+    return 1 if count else 0
+
+
 def backup_file(target: Path, rel_path: Path, backup_root: Path) -> None:
     if target.is_file():
         backup_target = backup_root / rel_path
@@ -483,6 +673,13 @@ def run_install(repo_root: Path, destination: Path, *, dry_run: bool) -> int:
         if previous is not None:
             current_cfg, retired_settings, kept_settings = retire_settings(current_cfg, previous.config, incoming_cfg)
         merged_cfg = merge_settings(current_cfg, incoming_cfg)
+        # Atomic replacement (or legacy cleanup) can discard a retirement survivor.
+        # Only announce settings that also survive the final merge unchanged.
+        replaced_settings = config_drift_paths(current_cfg, merged_cfg)
+        kept_settings = [
+            path for path in kept_settings
+            if not any(path == changed or path.startswith(changed + ".") for changed in replaced_settings)
+        ]
         merged_json = json.dumps(merged_cfg, indent=2) + "\n"
 
         active_path = repo_root / "global" / "AGENTS.md"
@@ -609,9 +806,19 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Print the portable source-content fingerprint without installing.",
     )
+    parser.add_argument("--check", action="store_true", help="Check the installed global baseline without changing files.")
+    parser.add_argument("--expect", default=None, metavar="FINGERPRINT", help="Require this source fingerprint with --check.")
     args = parser.parse_args(argv)
+    if sum((args.check, args.dry_run, args.fingerprint)) > 1:
+        parser.error("--check, --dry-run and --fingerprint cannot be combined")
     if args.fingerprint and (args.dry_run or args.destination is not None):
         parser.error("--fingerprint cannot be combined with --dry-run or --destination")
+    if args.expect is not None:
+        if not args.check:
+            parser.error("--expect requires --check")
+        args.expect = args.expect.strip().lower()
+        if not re.fullmatch(r"[0-9a-f]{64}", args.expect):
+            parser.error("--expect must contain exactly 64 hexadecimal characters")
 
     repo_root = Path(__file__).resolve().parent
     try:
@@ -627,6 +834,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     destination = args.destination.expanduser().resolve() if args.destination else default_destination()
+    if args.check:
+        return run_check(repo_root, destination, args.expect)
     return run_install(repo_root, destination, dry_run=args.dry_run)
 
 
