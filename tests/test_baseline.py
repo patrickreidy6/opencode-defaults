@@ -785,6 +785,39 @@ class RetirementTests(unittest.TestCase):
         for path in ("agents.old", "plugins", "mcp.servers.old"):
             self.assertNotIn(path, output)
 
+    def test_retired_server_with_nested_type_change_is_kept(self) -> None:
+        cases = (
+            ("scalar", True, 1),
+            ("object", {"enabled": True}, {"enabled": 1}),
+            ("array", [{"enabled": True}], [{"enabled": 1}]),
+        )
+        for name, previous_value, current_value in cases:
+            with self.subTest(nesting=name):
+                self.destination = self.root / name
+                config_path = self.source_a / "global/opencode.json"
+                config = json.loads(config_path.read_bytes())
+                config["mcp"]["servers"]["old"]["options"] = previous_value
+                config["mcp"]["servers"]["old"]["url"] = "SECRET_RETIRED_SERVER_VALUE"
+                config_path.write_text(json.dumps(config), encoding="utf-8")
+                self.install_source(self.source_a)
+                current = self.read_config()
+                current["mcp"]["servers"]["old"]["options"] = current_value
+                self.write_config(current)
+                before = snapshot(self.destination)
+                preview = self.install_source(self.source_b, dry_run=True)
+                self.assertEqual(snapshot(self.destination), before)
+                output = self.install_source(self.source_b)
+                updated = self.read_config()
+                self.assertIn("old", updated["mcp"]["servers"])
+                self.assertEqual(
+                    json.dumps(updated["mcp"]["servers"]["old"], sort_keys=True),
+                    json.dumps(current["mcp"]["servers"]["old"], sort_keys=True),
+                )
+                for text in (preview, output):
+                    self.assertIn("Kept locally changed retired setting: mcp.servers.old", text)
+                    self.assertEqual(text.count("mcp.servers.old"), 1)
+                    self.assertNotIn("SECRET_RETIRED_SERVER_VALUE", text)
+
     def test_type_changed_retired_setting_is_kept(self) -> None:
         self.install_source(self.source_a)
         current = self.read_config()
@@ -907,6 +940,10 @@ class RetirementTests(unittest.TestCase):
                 self.assertEqual(install.retire_settings({key: ["old"]}, {key: ["old"]}, {}), ({}, [f"{key} (-1)"], []))
                 self.assertEqual(install.retire_settings({key: []}, {key: ["old"]}, {}), ({key: []}, [], []))
                 self.assertEqual(install.retire_settings({}, {key: ["old"]}, {}), ({}, [], []))
+                self.assertEqual(
+                    install.retire_settings({key: [{"enabled": 1}]}, {key: [{"enabled": True}]}, {}),
+                    ({}, [f"{key} (-1)"], []),
+                )
 
     def test_settings_replacements_and_individually_retired_children(self) -> None:
         self.assertTrue(hasattr(install, "retire_settings"), "retire_settings interface is missing")

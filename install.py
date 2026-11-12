@@ -144,6 +144,16 @@ def retire_settings(
     removed: list[str] = []
     kept: list[str] = []
 
+    def unchanged(value: Any, old_value: Any) -> bool:
+        # Python equality equates booleans and numbers, including inside containers.
+        if type(value) is not type(old_value):
+            return False
+        if isinstance(value, dict):
+            return value.keys() == old_value.keys() and all(unchanged(value[key], old_value[key]) for key in value)
+        if isinstance(value, list):
+            return len(value) == len(old_value) and all(unchanged(item, old_item) for item, old_item in zip(value, old_value))
+        return value == old_value
+
     def walk(now: dict[str, Any], old: dict[str, Any], new: dict[str, Any], path: tuple[str, ...]) -> None:
         for key, old_value in old.items():
             if key not in now:
@@ -172,7 +182,7 @@ def retire_settings(
                 if was_nonempty and not value:
                     del now[key]
             elif dropped:
-                if type(value) is type(old_value) and value == old_value:
+                if unchanged(value, old_value):
                     del now[key]
                     removed.append(display)
                 else:
