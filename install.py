@@ -10,12 +10,17 @@ import json
 import os
 import re
 import shutil
+import stat
 import sys
+import tempfile
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 BASELINE_FILE = "baseline.json"
+RECEIPT_NAME = "opencode-defaults-receipt.json"
+RECEIPT_FORMAT = 1
 SKIP_PARTS = {"__pycache__", "node_modules", ".venv", ".git"}
 SKIP_SUFFIXES = {".pyc", ".pyo", ".pyd"}
 PR4_AGENTS_HEADER = "# Personal OpenCode Defaults"
@@ -170,6 +175,136 @@ def compute_fingerprint(repo_root: Path) -> str:
     return hashlib.sha256(manifest.encode("utf-8")).hexdigest()
 
 
+@dataclass(frozen=True)
+class Receipt:
+    fingerprint: str
+    files: dict[str, str]
+    config: dict[str, Any]
+
+
+class ReceiptError(Exception):
+    """An existing receipt cannot safely establish installation history."""
+
+
+class InstallError(Exception):
+    """An installation cannot proceed; the message contains no setting values."""
+
+
+def reject_json_constant(value: str) -> Any:
+    raise ValueError("non-finite numbers are not valid JSON")
+
+
+def path_state(destination: Path, rel: str) -> os.stat_result | None:
+    """Inspect a canonical relative path without traversing links or junctions."""
+    if (
+        not isinstance(rel, str)
+        or not rel
+        or any(char in rel for char in ("\\", ":", "\x00"))
+        or any(part in ("", ".", "..") for part in rel.split("/"))
+    ):
+        raise ValueError("expected a canonical relative POSIX path")
+
+    target = destination
+    parts = rel.split("/")
+    for index in range(len(parts) + 1):
+        try:
+            state = target.lstat()
+        except FileNotFoundError:
+            state = None
+            break
+        if stat.S_ISLNK(state.st_mode) or getattr(state, "st_reparse_tag", 0) == 0xA0000003:
+            raise ValueError("symlinks and directory junctions are not allowed")
+        if index < len(parts):
+            if not stat.S_ISDIR(state.st_mode):
+                raise ValueError("parent is not a directory")
+            target /= parts[index]
+
+    if not (destination / rel).resolve().is_relative_to(destination.resolve()):
+        raise ValueError("path resolves outside the destination")
+    return state
+
+
+def read_receipt(destination: Path) -> Receipt | None:
+    path = destination / RECEIPT_NAME
+    try:
+        state = path.lstat()
+    except FileNotFoundError:
+        return None
+    except OSError:
+        raise ReceiptError(f"{path}: unable to inspect receipt") from None
+    if not stat.S_ISREG(state.st_mode):
+        raise ReceiptError(f"{path}: expected a non-symlink regular file")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"), parse_constant=reject_json_constant)
+    except OSError:
+        raise ReceiptError(f"{path}: unable to read receipt") from None
+    except UnicodeError:
+        raise ReceiptError(f"{path}: invalid UTF-8") from None
+    except (ValueError, RecursionError):
+        raise ReceiptError(f"{path}: invalid JSON") from None
+
+    if not isinstance(data, dict) or not {"format", "fingerprint", "files", "config"} <= data.keys():
+        raise ReceiptError(f"{path}: expected an object containing format, fingerprint, files and config")
+    if type(data["format"]) is not int or data["format"] != RECEIPT_FORMAT:
+        raise ReceiptError(f"{path}: unsupported receipt format")
+    if not isinstance(data["files"], dict) or not isinstance(data["config"], dict):
+        raise ReceiptError(f"{path}: files and config must be objects")
+    if not isinstance(data["fingerprint"], str) or not re.fullmatch(r"[0-9a-f]{64}", data["fingerprint"]):
+        raise ReceiptError(f"{path}: invalid fingerprint")
+    for rel, digest in data["files"].items():
+        if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+            raise ReceiptError(f"{path}: invalid managed file hash")
+        try:
+            path_state(destination, rel)
+        except (OSError, ValueError, UnicodeError):
+            raise ReceiptError(f"{path}: invalid or inaccessible managed file path") from None
+    return Receipt(data["fingerprint"], data["files"], data["config"])
+
+
+def write_receipt(destination: Path, receipt: Receipt) -> None:
+    data = {
+        "format": RECEIPT_FORMAT,
+        "fingerprint": receipt.fingerprint,
+        "files": receipt.files,
+        "config": receipt.config,
+    }
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", newline="\n", dir=destination,
+            prefix=f".{RECEIPT_NAME}.", suffix=".tmp", delete=False,
+        ) as stream:
+            temporary = Path(stream.name)
+            stream.write(json.dumps(data, indent=2, sort_keys=True) + "\n")
+        os.replace(temporary, destination / RECEIPT_NAME)
+        temporary = None
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def verify_installed(destination: Path, expected: dict[str, str]) -> list[str]:
+    failures = []
+    for rel, digest in expected.items():
+        try:
+            state = path_state(destination, rel)
+            if state is None or not stat.S_ISREG(state.st_mode) or sha256_file(destination / rel) != digest:
+                failures.append(rel)
+        except (OSError, ValueError, UnicodeError):
+            failures.append(rel)
+    return sorted(failures)
+
+
+def read_config(path: Path) -> dict[str, Any]:
+    try:
+        config = json.loads(path.read_text(encoding="utf-8-sig"), parse_constant=reject_json_constant)
+    except (ValueError, RecursionError):
+        raise InstallError(f"{path}: expected valid UTF-8 JSON") from None
+    if not isinstance(config, dict):
+        raise InstallError(f"{path}: expected a JSON object")
+    return config
+
+
 def backup_file(target: Path, rel_path: Path, backup_root: Path) -> None:
     if target.is_file():
         backup_target = backup_root / rel_path
@@ -204,6 +339,147 @@ def prune_retired_pr4_assets(destination: Path, backup_root: Path, *, dry_run: b
             parent.rmdir()
 
 
+def run_install(repo_root: Path, destination: Path, *, dry_run: bool) -> int:
+    active_path = repo_root / BASELINE_FILE
+    try:
+        load_baseline(repo_root)
+        jsonc_path = destination / "opencode.jsonc"
+        if jsonc_path.exists():
+            raise InstallError(f"{jsonc_path} already exists. Reconcile it with opencode.json before installing.")
+
+        previous = read_receipt(destination)
+        active_path = repo_root / "global" / "opencode.json"
+        incoming_cfg = read_config(active_path)
+        files = managed_files(repo_root)
+        hashes = {}
+        for rel, source in files.items():
+            active_path = source
+            hashes[rel] = sha256_file(source)
+        active_path = repo_root
+        receipt = Receipt(compute_fingerprint(repo_root), hashes, incoming_cfg)
+        if previous is not None and previous.fingerprint == receipt.fingerprint and previous != receipt:
+            raise ReceiptError(f"{destination / RECEIPT_NAME}: inconsistent history for the same fingerprint")
+
+        # Preflight incoming managed writes and their backup parents.
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+        backup_root = destination / "backups" / f"harness-{timestamp}"
+        for rel in [*files, "opencode.json", RECEIPT_NAME]:
+            active_path = destination / rel
+            state = path_state(destination, rel)
+            if state is not None and not stat.S_ISREG(state.st_mode):
+                raise InstallError(f"{active_path}: expected a non-symlink regular file")
+            backup_rel = (backup_root.relative_to(destination) / rel).as_posix()
+            path_state(destination, backup_rel)
+
+        # The existing PR4 retirement stage also mutates paths, so inspect it
+        # before writing config or copying any incoming managed files.
+        for rel_path in (*RETIRED_PR4_DIRS, *RETIRED_PR4_FILES):
+            active_path = destination / rel_path
+            state = path_state(destination, rel_path.as_posix())
+            if rel_path in RETIRED_PR4_DIRS and state is not None and stat.S_ISDIR(state.st_mode):
+                for child in active_path.rglob("*"):
+                    active_path = child
+                    child_rel = child.relative_to(destination)
+                    path_state(destination, child_rel.as_posix())
+                    path_state(destination, (backup_root.relative_to(destination) / child_rel).as_posix())
+            else:
+                path_state(destination, (backup_root.relative_to(destination) / rel_path).as_posix())
+
+        config_path = destination / "opencode.json"
+        active_path = config_path
+        current_cfg = read_config(config_path) if path_state(destination, "opencode.json") is not None else {}
+        merged_cfg = merge_settings(current_cfg, incoming_cfg)
+        merged_json = json.dumps(merged_cfg, indent=2) + "\n"
+
+        active_path = repo_root / "global" / "AGENTS.md"
+        incoming_agents = active_path.read_text(encoding="utf-8-sig")
+        agents_target = destination / "AGENTS.md"
+        agents_local = destination / "AGENTS.local.md"
+        migrate_local_agents = False
+        existing_agents_text = ""
+        active_path = agents_local
+        try:
+            agents_local.lstat()
+            local_agents_present = True
+        except FileNotFoundError:
+            local_agents_present = False
+        active_path = agents_target
+        if agents_target.is_file() and not local_agents_present:
+            existing_agents_text = agents_target.read_text(encoding="utf-8-sig")
+            if existing_agents_text != incoming_agents and not re.match(
+                r"^\s*" + re.escape(PR4_AGENTS_HEADER) + r"\b", existing_agents_text
+            ):
+                migrate_local_agents = True
+
+        if dry_run:
+            print(f"[dry-run] Would install harness into {destination}")
+            print(f"[dry-run] Would write merged {config_path}")
+            if migrate_local_agents:
+                print(f"[dry-run] Would preserve existing custom AGENTS.md as {agents_local}")
+            prune_retired_pr4_assets(destination, backup_root, dry_run=True)
+            for rel in files:
+                print(f"[dry-run] Would install {destination / rel}")
+            print(f"[dry-run] Would write {destination / RECEIPT_NAME}")
+            return 0
+
+        active_path = destination
+        destination.mkdir(parents=True, exist_ok=True)
+        active_path = config_path
+        backup_file(config_path, Path("opencode.json"), backup_root)
+        config_path.write_text(merged_json, encoding="utf-8", newline="\n")
+        if migrate_local_agents:
+            active_path = agents_local
+            agents_local.write_text(existing_agents_text, encoding="utf-8", newline="\n")
+
+        active_path = destination
+        prune_retired_pr4_assets(destination, backup_root, dry_run=False)
+        for rel, source in files.items():
+            active_path = target = destination / rel
+            backup_file(target, Path(rel), backup_root)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+
+        failures = verify_installed(destination, receipt.files)
+        try:
+            state = path_state(destination, "opencode.json")
+            if state is None or not stat.S_ISREG(state.st_mode) or read_config(config_path) != merged_cfg:
+                failures.append("opencode.json")
+        except (OSError, ValueError, UnicodeError, InstallError):
+            failures.append("opencode.json")
+        if failures:
+            print("Error: installed verification failed:", file=sys.stderr)
+            for rel in sorted(set(failures)):
+                print(rel, file=sys.stderr)
+            return 1
+
+        active_path = destination / RECEIPT_NAME
+        backup_file(active_path, Path(RECEIPT_NAME), backup_root)
+        write_receipt(destination, receipt)
+    except ReceiptError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        print(
+            f"Restore a verified receipt from `{destination / 'backups' / 'harness-*' / RECEIPT_NAME}`. "
+            "If no valid backup exists, preserve the damaged receipt and reconcile ownership manually "
+            "before deliberately bootstrapping without it; automatic retirement history will be lost.",
+            file=sys.stderr,
+        )
+        return 1
+    except (BaselineError, InstallError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+    except (OSError, ValueError, UnicodeError):
+        print(f"Error: {active_path}: unable to install (I/O error, invalid path or invalid text)", file=sys.stderr)
+        return 1
+
+    print(f"Installed harness in {destination}")
+    if migrate_local_agents:
+        print(f"Preserved pre-existing custom AGENTS.md at {agents_local}")
+    if backup_root.exists():
+        print(f"Previous files backed up in {backup_root}")
+    print("OpenCode reloads config and skills automatically (or run /reload in an active session).")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Install personal OpenCode V2 global defaults.")
     parser.add_argument(
@@ -228,8 +504,8 @@ def main(argv: list[str] | None = None) -> int:
 
     repo_root = Path(__file__).resolve().parent
     try:
-        load_baseline(repo_root)
         if args.fingerprint:
+            load_baseline(repo_root)
             print(compute_fingerprint(repo_root))
             return 0
     except BaselineError as exc:
@@ -240,74 +516,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     destination = args.destination.expanduser().resolve() if args.destination else default_destination()
-
-    jsonc_path = destination / "opencode.jsonc"
-    if jsonc_path.exists():
-        print(
-            f"Error: {jsonc_path} already exists. Reconcile it with opencode.json before installing.",
-            file=sys.stderr,
-        )
-        return 1
-
-    incoming_cfg = json.loads((repo_root / "global" / "opencode.json").read_text(encoding="utf-8-sig"))
-    config_path = destination / "opencode.json"
-    if config_path.is_file():
-        current_cfg = json.loads(config_path.read_text(encoding="utf-8-sig"))
-    else:
-        current_cfg = {}
-
-    merged_cfg = merge_settings(current_cfg, incoming_cfg)
-    merged_json = json.dumps(merged_cfg, indent=2) + "\n"
-
-    files = collect_files(repo_root)
-    incoming_agents = (repo_root / "global" / "AGENTS.md").read_text(encoding="utf-8-sig")
-    agents_target = destination / "AGENTS.md"
-    agents_local = destination / "AGENTS.local.md"
-    migrate_local_agents = False
-    existing_agents_text = ""
-
-    if agents_target.is_file() and not agents_local.exists():
-        existing_agents_text = agents_target.read_text(encoding="utf-8-sig")
-        if existing_agents_text != incoming_agents and not re.match(
-            r"^\s*" + re.escape(PR4_AGENTS_HEADER) + r"\b", existing_agents_text
-        ):
-            migrate_local_agents = True
-
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")[:-3]
-    backup_root = destination / "backups" / f"harness-{timestamp}"
-
-    if args.dry_run:
-        print(f"[dry-run] Would install harness into {destination}")
-        print(f"[dry-run] Would write merged {config_path}")
-        if migrate_local_agents:
-            print(f"[dry-run] Would preserve existing custom AGENTS.md as {agents_local}")
-        prune_retired_pr4_assets(destination, backup_root, dry_run=True)
-        for _, rel in files:
-            print(f"[dry-run] Would install {destination / rel}")
-        return 0
-
-    destination.mkdir(parents=True, exist_ok=True)
-    backup_file(config_path, Path("opencode.json"), backup_root)
-    config_path.write_text(merged_json, encoding="utf-8", newline="\n")
-
-    if migrate_local_agents:
-        agents_local.write_text(existing_agents_text, encoding="utf-8", newline="\n")
-
-    prune_retired_pr4_assets(destination, backup_root, dry_run=False)
-
-    for src, rel in files:
-        target = destination / rel
-        backup_file(target, rel, backup_root)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, target)
-
-    print(f"Installed harness in {destination}")
-    if migrate_local_agents:
-        print(f"Preserved pre-existing custom AGENTS.md at {agents_local}")
-    if backup_root.exists():
-        print(f"Previous files backed up in {backup_root}")
-    print("OpenCode reloads config and skills automatically (or run /reload in an active session).")
-    return 0
+    return run_install(repo_root, destination, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":
