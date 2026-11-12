@@ -1,6 +1,6 @@
 # Baseline installation and verification
 
-Design revised 2026-11-11 after review. Awaiting Patrick's approval; nothing here is implemented yet.
+Approved for planning 2026-11-11, with the review amendments recorded under Decisions.
 
 ## Intent
 
@@ -13,7 +13,7 @@ This repo installs a baseline and checks one installation against it. `ops-infra
 - One identity for a baseline that survives being copied anywhere.
 - A read-only check that passes only when an installation holds exactly that baseline.
 - Reinstalling converges: content an earlier baseline installed and the new one drops is cleaned up.
-- Local additions survive and never fail the check.
+- Local additions survive and never fail the check, unless placed where the installer would reorder them.
 
 The change has failed, even if it runs, when:
 
@@ -51,7 +51,9 @@ A successful install writes `opencode-defaults-receipt.json` in the destination.
 - each installed file's destination-relative path and SHA-256;
 - a copy of the baseline's `global/opencode.json`, which is repository content, never the merged machine configuration.
 
-Write it last. Re-read each installed file, confirm its hash, then replace the receipt in one step. On any failure, exit nonzero and leave the previous receipt alone. Back up the previous receipt with the other overwritten files. Before trusting a receipt, validate its structure and that every path is relative and stays inside the destination. Treat an unreadable or unknown-format receipt as absent.
+Write it last. Re-read each installed file, confirm its hash, then replace the receipt in one step. On any failure, exit nonzero and leave the previous receipt alone. Back up the previous receipt with the other overwritten files. Before trusting a receipt, validate its structure and that every path is relative and stays inside the destination.
+
+A missing receipt is bootstrap. An existing malformed, unreadable or unsupported receipt stops install and dry-run before any writes. Name the receipt path and a safe reason, then give recovery guidance: restore a verified receipt from `<destination>/backups/harness-*/opencode-defaults-receipt.json`. If no valid backup exists, preserve the damaged receipt and reconcile ownership manually before deliberately bootstrapping without it; automatic retirement history will be lost. Never automatically delete or replace the invalid receipt.
 
 Dry-run writes nothing. Destination resolution, merging, backups, the `AGENTS.local.md` migration, and the refusal when `opencode.jsonc` exists are unchanged. Installing does not inspect the runtime.
 
@@ -84,11 +86,11 @@ sh ./install.sh --fingerprint
 - managed configuration differs, or `opencode.jsonc` exists in the destination;
 - the OpenCode CLI is missing or is not the version in `baseline.json`.
 
-**Configuration** matches when merging the baseline into the installed configuration would change nothing, ignoring order within `plugins`, `instructions`, and `skills`. Reuse the installer's `merge_settings` so check and install cannot disagree. That one rule covers changed values, a missing or altered managed MCP server, legacy V1 keys the installer strips, and a second Superpowers reference. Tried against the current `merge_settings` on 2026-11-11: eleven fresh, local-addition, and drift cases were all classified correctly.
+**Configuration** matches when `merge_settings(installed, baseline) == installed`, without sorting lists. List order counts, including within `plugins`, `instructions`, and `skills`. Reinstall may reposition a local list entry; that placement is drift. Reuse the installer's `merge_settings` so check and install cannot disagree. That one rule also covers changed values, a missing or altered managed MCP server, legacy V1 keys the installer strips, and a second Superpowers reference.
 
 **Runtime:** run `opencode --version` with a short timeout, looking on `PATH` and then in the standalone install location `~/.opencode/bin`. Read the version as the official install script does: last word, leading `v` dropped. This checks the installed binary, not a server that is already running.
 
-**Local additions** are listed, not judged: configuration keys the baseline does not own, by key path, with counts for extra entries in the three root lists; unmanaged files under `agents/`, `commands/`, `skills/`, and `plugins/`, with a wholly unmanaged folder listed once; and `AGENTS.local.md`. Names only, never values or contents. Output is plain, sorted lines so two workspaces' reports can be compared side by side.
+**Local additions** are listed at the first unowned boundary: configuration key names by key path, counts for extra entries in the root `plugins`, `instructions`, and `skills` lists, local files under `agents/`, `commands/`, `skills/`, and `plugins/`, and `AGENTS.local.md`. Stop at an unowned configuration key rather than inspecting its values. Treat the four directory roots as containers and walk deeper only along prefixes containing managed paths. List each nonempty unowned directory once, without descending its tree; skip directly empty directories. Names only, never values or contents. Print one plain, sorted `Local <item>` line per item, or `Local none` when there are no additions. Local presence alone is never a finding; a list placement that reinstall would change is a configuration finding. Surface additions are expected; `sim-funds` and `sim-prime-broker` should show `Local none`.
 
 **Exit codes:** `0` match; `1` any finding, or a check that could not complete; `2` usage error, such as `--expect` without `--check`, `--check` with `--dry-run`, or a malformed fingerprint.
 
@@ -104,7 +106,8 @@ Receipt      3f9c1a7e...  ok
 Files        edited   skills/writer/SKILL.md
 Config       differs  agents.title.model
 Runtime      opencode 2.2.7  ok
-Local        providers, commands/add-notes.md  (listed, not checked)
+Local        commands/add-notes.md
+Local        providers
 Result       DRIFT, 2 findings
 ```
 
@@ -125,23 +128,25 @@ Not built here. This is the interface it relies on.
 
 ## Files and verification
 
-Add `baseline.json`. Change `install.py`, `install.ps1`, `.gitattributes`, `tests/test_install.py`, `README.md`, and the root `AGENTS.md`. `install.sh` already forwards arguments.
+Add `baseline.json`. Change `install.py`, `install.ps1`, `.gitattributes`, `tests/test_install.py`, `README.md`, the root `AGENTS.md`, and `.opencode/skills/project-setup/SKILL.md`. `install.sh` already forwards arguments.
+
+`project-setup` reads the exact OpenCode version from the defaults source's `baseline.json` instead of requiring `2.0.4+`. Automatic use of the check inside the skill remains out of scope.
 
 README: installing the runtime at the pinned version (the official install script accepts `--version`, and `opencode upgrade <version>` covers an existing install), how a workspace without repository access gets the source, the three modes, how to change the baseline, retirement in place of today's "managed command names are replaced on update" note, and the limits above. Upgrading the runtime means bumping `baseline.json`; until then the check fails on any machine that upgraded, including the Surface.
 
 `docs/cross-model-workflow-design.md` tells maintainers to add a removed command to `RETIRED_PR4_FILES`. Update that note: the receipt now handles it.
 
-Sequencing: the uncommitted `/xm-*` commands work edits `install.py`, `README.md`, `AGENTS.md`, and the tests. Land it before starting this.
+Sequencing done: the `/xm-*` commands work has been committed; all five `global/commands/xm-*.md` files are tracked.
 
 Tests use temporary directories with no credentials or network, and stub the CLI probe so they do not depend on an installed OpenCode. Cover:
 
 - fingerprint: stable, changes with any input, equal for a copy without `.git`, and a fixed fixture yields a recorded value so the format cannot change silently;
-- install: receipt written, repeat install stable, dry-run writes nothing, failed verification keeps the old receipt;
+- install: receipt written, repeat install stable, dry-run writes nothing, failed verification keeps the old receipt, an existing malformed/unreadable/unsupported receipt stops install and dry-run before writes;
 - retirement: untouched file and setting removed with a backup, changed ones kept and named;
-- check: passes after install, one case per finding, local additions listed without values and not failing, `--expect` match and mismatch, destination unchanged by the check;
+- check: passes after install, one case per finding, local additions listed at the first unowned boundary without values and not failing on presence alone, list placement that reinstall would change reported as drift, `--expect` match and mismatch, destination unchanged by the check;
 - usage errors and both wrappers.
 
-Verify with `uv run --no-project python -m unittest discover -s tests -v` and an isolated install, check, edit, check run on Windows. Record the Linux result at rollout.
+Verify with `uv run --no-project python -m unittest discover -s tests -v`. Before rollout, require Windows/Linux fixture fingerprint parity and an isolated install, check, edit, check run on both platforms: the first check passes with the pinned runtime and `Local none`, then the edited managed file is detected as drift. Keep SSH outside unit tests. A missing real Linux runtime or unavailable Linux host leaves acceptance pending; fake-CLI unit tests do not establish live runtime readiness.
 
 ## Left to the builder
 
@@ -151,10 +156,12 @@ Receipt field names, output wording, how the wrappers pass options, internal str
 
 Patrick's: receipt plus check command; then, after review on 2026-11-11, the content fingerprint, `--expect`, the pinned runtime, and removing retired files.
 
-Calls made while revising, for Patrick to confirm:
+Calls made while revising, confirmed with planning approval:
 
 - Untouched retired settings are removed like files, and anything changed locally is kept as a local addition. The review had left retired settings and edited files as findings until removed by hand, which would mean a hand edit on every machine each time the baseline drops a setting.
 - The receipt holds no commit. Workspace copies carry no Git metadata to read it from, so the commit-to-fingerprint pairing lives in the `ops-infra` record.
 - `--fingerprint` exists so `--expect` has a value to use.
-- The check lists local additions by name and never fails on them.
+- The check lists local additions by name and never fails on their presence alone; placement that the installer would reorder is drift.
 - The runtime check looks on `PATH`, then in `~/.opencode/bin`.
+
+Three `/xm-spec-review` reports on 2026-11-11 led to the amendments above. Patrick accepted trimmed #1 (Local reporting at the first unowned boundary) and #2–#5 (ordered merge comparison, `project-setup` reading the exact version from `baseline.json`, Windows/Linux acceptance before rollout, and stopping before writes on an existing invalid receipt).
