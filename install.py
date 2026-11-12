@@ -734,7 +734,8 @@ def run_install(repo_root: Path, destination: Path, *, dry_run: bool, reset_shar
         except FileNotFoundError:
             local_agents_present = False
         active_path = agents_target
-        if agents_target.is_file() and not local_agents_present:
+        reset_owned_agents = reset_shared and previous is not None and 'AGENTS.md' in previous.files
+        if agents_target.is_file() and not local_agents_present and not reset_owned_agents:
             existing_agents_text = agents_target.read_text(encoding="utf-8-sig")
             if existing_agents_text != incoming_agents and not re.match(
                 r"^\s*" + re.escape(PR4_AGENTS_HEADER) + r"\b", existing_agents_text

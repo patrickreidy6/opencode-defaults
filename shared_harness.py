@@ -76,22 +76,36 @@ def project_items(project: Path) -> list[str]:
     root = Path(result.stdout.strip()).resolve() if result.returncode == 0 else project
     if not project.is_relative_to(root):
         root = project
+    home = Path.home().resolve()
     items = []
+
+    def display(path: Path) -> str:
+        return path.relative_to(root).as_posix() if path.is_relative_to(root) else path.as_posix()
+
     current = project
     while True:
-        prefix = current.relative_to(root)
-        for name in ('AGENTS.md', 'opencode.json', 'opencode.jsonc', '.opencode/AGENTS.md',
-                     '.opencode/opencode.json', '.opencode/opencode.jsonc'):
+        # Config discovery reaches the filesystem root, including above a Git repo.
+        names = ['opencode.json', 'opencode.jsonc', '.opencode/opencode.json', '.opencode/opencode.jsonc']
+        within_project = current.is_relative_to(root)
+        if within_project or (project.is_relative_to(home) and current.is_relative_to(home)):
+            names.append('AGENTS.md')
+        if within_project:
+            names.append('.opencode/AGENTS.md')
+        for name in names:
             path = current / name
             if path.exists() or path.is_symlink():
-                items.append((prefix / name).as_posix())
+                items.append(display(path))
         extensions = current / '.opencode'
         if extensions.is_symlink():
-            items.append((prefix / '.opencode').as_posix() + '/')
-        elif extensions.is_dir():
+            items.append(display(extensions) + '/')
+        elif within_project and extensions.is_dir():
             for name in install.list_local_additions(extensions, None, {}, set()):
-                items.append((prefix / '.opencode' / name).as_posix() + ('/' if name.endswith('/') else ''))
-        if current == root:
+                items.append(display(extensions / name) + ('/' if name.endswith('/') else ''))
+        elif (extensions / 'plugins').is_dir():
+            # Plugin directories follow discovered configuration, unlike project skills.
+            for plugin in (extensions / 'plugins').iterdir():
+                items.append(display(plugin) + ('/' if plugin.is_dir() and not plugin.is_symlink() else ''))
+        if current.parent == current:
             break
         current = current.parent
     return sorted(set(items))
@@ -185,6 +199,7 @@ def apply_update(source: Path, destination: Path) -> int:
         run_opencode('upgrade', pinned)
         if install.probe_opencode_version() != ('ok', pinned):
             raise HarnessError('OpenCode CLI version still differs from the pin; harness update was not applied.')
+        print('The CLI binary changed. Run `opencode service restart` from a terminal to activate it in the background service.', flush=True)
     if install.run_install(source, destination, dry_run=False, reset_shared=True):
         raise HarnessError('Harness installation did not complete. Inspect the reported backup/receipt status.')
     try:
@@ -192,8 +207,6 @@ def apply_update(source: Path, destination: Path) -> int:
     except HarnessError as exc:
         raise HarnessError(f'Shared defaults were installed, but reload failed. {exc}') from None
     print('Shared harness updated. Workspace-only additions and project files were preserved.')
-    if upgraded:
-        print('The CLI binary changed. Run `opencode service restart` from a terminal to activate it in the background service.')
     return 0
 
 

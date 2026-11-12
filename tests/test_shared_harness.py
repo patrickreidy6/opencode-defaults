@@ -138,6 +138,15 @@ class DriftTests(unittest.TestCase):
         self.assertEqual((self.dest / 'AGENTS.md').read_bytes(), DEFAULT_SOURCE['global/AGENTS.md'])
         self.assertEqual(snapshot(self.project), project_before)
         self.assertTrue(list((self.dest / 'backups').glob('harness-*/AGENTS.md')))
+        self.assertFalse((self.dest / 'AGENTS.local.md').exists(), 'Reset must not reactivate shared edits as local instructions')
+
+    def test_update_preserves_existing_local_instructions(self):
+        local = self.dest / 'AGENTS.local.md'
+        local.write_bytes(b'intentional local instructions\n')
+        (self.dest / 'AGENTS.md').write_bytes(b'edited shared instructions\n')
+        with contextlib.redirect_stdout(io.StringIO()), mock.patch.object(install, 'probe_opencode_version', return_value=('ok', '2.2.7')), mock.patch.object(shared_harness, 'run_opencode'):
+            self.assertEqual(shared_harness.apply_update(self.source, self.dest), 0)
+        self.assertEqual(local.read_bytes(), b'intentional local instructions\n')
 
     def test_upgrade_failure_does_not_apply_harness_or_claim_success(self):
         before = snapshot(self.dest)
@@ -168,6 +177,35 @@ class DriftTests(unittest.TestCase):
             with self.assertRaisesRegex(shared_harness.HarnessError, 'were installed, but reload failed'):
                 shared_harness.apply_update(self.source, self.dest)
         self.assertEqual((self.dest / 'AGENTS.md').read_bytes(), DEFAULT_SOURCE['global/AGENTS.md'])
+
+    def test_upgrade_restart_notice_survives_install_or_reload_failure(self):
+        for stage in ('install', 'reload'):
+            with self.subTest(stage=stage):
+                output = io.StringIO()
+                versions = [('ok', '2.2.5'), ('ok', '2.2.7')]
+                runtime = [None, shared_harness.HarnessError('reload failed')] if stage == 'reload' else [None]
+                with contextlib.redirect_stdout(output), mock.patch.object(install, 'probe_opencode_version', side_effect=versions), mock.patch.object(shared_harness, 'run_opencode', side_effect=runtime), mock.patch.object(install, 'run_install', side_effect=[0, 1 if stage == 'install' else 0]):
+                    with self.assertRaises(shared_harness.HarnessError):
+                        shared_harness.apply_update(self.source, self.dest)
+                self.assertIn('opencode service restart', output.getvalue())
+
+    def test_project_inventory_includes_configuration_above_git_root(self):
+        parent_config = self.root / 'opencode.json'
+        parent_config.write_bytes(b'{"model":"private-value"}')
+        nested_config = self.root / '.opencode/opencode.jsonc'
+        nested_config.parent.mkdir()
+        nested_config.write_bytes(b'{}')
+        items = shared_harness.project_items(self.project)
+        self.assertIn(parent_config.as_posix(), items)
+        self.assertIn(nested_config.as_posix(), items)
+
+    def test_non_git_inventory_includes_parent_configuration(self):
+        loose = self.root / 'loose/child'
+        loose.mkdir(parents=True)
+        config = loose.parent / 'opencode.jsonc'
+        config.write_bytes(b'{}')
+        with mock.patch.dict(os.environ, {'GIT_CEILING_DIRECTORIES': str(self.root)}):
+            self.assertIn(config.as_posix(), shared_harness.project_items(loose))
 
 
 class GitSourceTests(unittest.TestCase):
