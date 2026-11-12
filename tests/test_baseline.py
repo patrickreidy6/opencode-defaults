@@ -1,4 +1,5 @@
 import contextlib
+import copy
 import hashlib
 import io
 import json
@@ -676,6 +677,341 @@ class ReceiptTests(unittest.TestCase):
         self.assertNotIn("SECRET_COPY_ERROR", stderr)
         self.assertNotIn("Traceback", stderr)
         self.assertEqual(self.receipt_path.read_bytes(), previous)
+
+
+class RetirementTests(unittest.TestCase):
+    def setUp(self) -> None:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.destination = self.root / "destination"
+        self.old_files = {
+            "commands/xm-old.md": b"Old command\n",
+            "skills/old/SKILL.md": b"Old skill\n",
+            "skills/old/references/r.md": b"Old reference\n",
+        }
+        config = json.loads(DEFAULT_SOURCE["global/opencode.json"])
+        config["agents"]["old"] = {"model": "old-model"}
+        config["mcp"]["servers"]["old"] = {"type": "remote", "url": "https://old.example/mcp"}
+        config["plugins"].append("p-old")
+        files = {
+            ("global/" if rel.startswith("commands/") else ".opencode/") + rel: content
+            for rel, content in self.old_files.items()
+        }
+        self.source_a = make_source(self.root / "source-a", {
+            **DEFAULT_SOURCE, **files, "global/opencode.json": json.dumps(config).encode(),
+        })
+        self.source_b = make_source(self.root / "source-b")
+
+    def install_source(self, source: Path, *, dry_run: bool = False) -> str:
+        result = run_installer(
+            source, "--destination", str(self.destination), *(["--dry-run"] if dry_run else [])
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stderr, "")
+        return result.stdout
+
+    def read_config(self) -> dict:
+        return json.loads((self.destination / "opencode.json").read_bytes())
+
+    def write_config(self, config: dict) -> None:
+        (self.destination / "opencode.json").write_text(json.dumps(config), encoding="utf-8")
+
+    def test_untouched_retired_files_removed_with_backup(self) -> None:
+        self.install_source(self.source_a)
+        self.install_source(self.source_b)
+        for rel, content in self.old_files.items():
+            with self.subTest(rel=rel):
+                self.assertFalse((self.destination / rel).exists())
+                backups = list((self.destination / "backups").glob(f"harness-*/{rel}"))
+                self.assertEqual([path.read_bytes() for path in backups], [content])
+        self.assertFalse((self.destination / "skills/old").exists())
+        self.assertTrue((self.destination / "skills").is_dir())
+        self.assertTrue((self.destination / "commands").is_dir())
+        receipt = json.loads((self.destination / install.RECEIPT_NAME).read_bytes())
+        self.assertEqual(set(receipt["files"]), {"AGENTS.md", "commands/xm-demo.md", "skills/demo/SKILL.md"})
+
+    def test_locally_changed_retired_file_kept_and_named_once(self) -> None:
+        self.install_source(self.source_a)
+        target = self.destination / "commands/xm-old.md"
+        target.write_bytes(b"SECRET_LOCAL_COMMAND\n")
+        output = self.install_source(self.source_b)
+        self.assertEqual(target.read_bytes(), b"SECRET_LOCAL_COMMAND\n")
+        self.assertEqual(output.count("commands/xm-old.md"), 1)
+        self.assertIn("Kept locally changed retired file: commands/xm-old.md", output)
+        self.assertNotIn("SECRET_LOCAL_COMMAND", output)
+
+    def test_untouched_retired_settings_removed(self) -> None:
+        self.install_source(self.source_a)
+        current = self.read_config()
+        current["providers"] = {"local": {"apiKey": "SECRET_LOCAL_KEY"}}
+        current["plugins"].append("p-local")
+        self.write_config(current)
+        before = (self.destination / "opencode.json").read_bytes()
+        output = self.install_source(self.source_b)
+        updated = self.read_config()
+        self.assertNotIn("old", updated["agents"])
+        self.assertNotIn("old", updated["mcp"]["servers"])
+        self.assertEqual(updated["plugins"], ["managed-plugin", "p-local"])
+        self.assertEqual(updated["providers"], current["providers"])
+        self.assertNotIn("SECRET_LOCAL_KEY", output)
+        backups = list((self.destination / "backups").glob("harness-*/opencode.json"))
+        self.assertEqual([path.read_bytes() for path in backups], [before])
+
+    def test_locally_changed_retired_settings_kept_and_named(self) -> None:
+        self.install_source(self.source_a)
+        current = self.read_config()
+        current["agents"]["old"]["model"] = "SECRET_LOCAL_MODEL"
+        current["mcp"]["servers"]["old"]["url"] = "SECRET_LOCAL_URL"
+        self.write_config(current)
+        output = self.install_source(self.source_b)
+        updated = self.read_config()
+        self.assertEqual(updated["agents"]["old"], current["agents"]["old"])
+        self.assertEqual(updated["mcp"]["servers"]["old"], current["mcp"]["servers"]["old"])
+        for path in ("agents.old.model", "mcp.servers.old"):
+            self.assertIn(f"Kept locally changed retired setting: {path}", output)
+            self.assertEqual(output.count(path), 1)
+        self.assertNotIn("SECRET_LOCAL", output)
+
+    def test_already_deleted_retired_settings_are_ignored(self) -> None:
+        self.install_source(self.source_a)
+        current = self.read_config()
+        del current["agents"]["old"]["model"]
+        del current["plugins"]
+        del current["mcp"]["servers"]["old"]
+        self.write_config(current)
+        output = self.install_source(self.source_b)
+        self.assertEqual(self.read_config()["agents"]["old"], {})
+        for path in ("agents.old", "plugins", "mcp.servers.old"):
+            self.assertNotIn(path, output)
+
+    def test_type_changed_retired_setting_is_kept(self) -> None:
+        self.install_source(self.source_a)
+        current = self.read_config()
+        current["agents"]["old"] = "SECRET_LOCAL_OVERRIDE"
+        self.write_config(current)
+        output = self.install_source(self.source_b)
+        self.assertEqual(self.read_config()["agents"]["old"], "SECRET_LOCAL_OVERRIDE")
+        self.assertEqual(output.count("agents.old"), 1)
+        self.assertIn("Kept locally changed retired setting: agents.old", output)
+        self.assertNotIn("SECRET_LOCAL_OVERRIDE", output)
+
+    def test_case_only_command_rename_preserves_incoming_and_backup(self) -> None:
+        for edited in (False, True):
+            with self.subTest(edited=edited), tempfile.TemporaryDirectory(dir=self.root) as tmp:
+                root = Path(tmp)
+                self.destination = root / "destination"
+                source_a = make_source(root / "source-a", {
+                    **DEFAULT_SOURCE, "global/commands/XM-Old.md": b"Old bytes\n",
+                })
+                source_b = make_source(root / "source-b", {
+                    **DEFAULT_SOURCE, "global/commands/xm-old.md": b"New bytes\n",
+                })
+                self.install_source(source_a)
+                old = self.destination / "commands/XM-Old.md"
+                incoming = self.destination / "commands/xm-old.md"
+                aliases = incoming.exists() and incoming.samefile(old)
+                old_bytes = b"Local edited bytes\n" if edited else b"Old bytes\n"
+                if edited:
+                    old.write_bytes(old_bytes)
+                preview = self.install_source(source_b, dry_run=True)
+                output = self.install_source(source_b)
+                self.assertEqual(incoming.read_bytes(), b"New bytes\n")
+                entries = [p.name for p in incoming.parent.iterdir() if p.name.lower() == "xm-old.md"]
+                if not edited or aliases:
+                    self.assertEqual(len(entries), 1)
+                    backups = [
+                        p for p in (self.destination / "backups").rglob("*")
+                        if p.is_file() and p.name.lower() == "xm-old.md"
+                    ]
+                    self.assertEqual([p.read_bytes() for p in backups], [old_bytes])
+                    self.assertNotIn("Kept locally changed retired file", output)
+                    self.assertNotIn("Kept locally changed retired file", preview)
+                else:
+                    self.assertEqual(set(entries), {"XM-Old.md", "xm-old.md"})
+                    self.assertEqual(old.read_bytes(), old_bytes)
+                    self.assertIn("Kept locally changed retired file: commands/XM-Old.md", output)
+                receipt = json.loads((self.destination / install.RECEIPT_NAME).read_bytes())
+                self.assertIn("commands/xm-old.md", receipt["files"])
+                self.assertNotIn("commands/XM-Old.md", receipt["files"])
+
+    def test_objects_emptied_by_removal_are_removed(self) -> None:
+        self.assertEqual(
+            install.retire_settings(
+                {"agents": {"old": {"model": "x"}}, "experimental": {}},
+                {"agents": {"old": {"model": "x"}}}, {},
+            ),
+            ({"experimental": {}}, ["agents.old.model"], []),
+        )
+        (self.source_a / "global/opencode.json").write_text(
+            '{"agents": {"old": {"model": "x"}}, "empty": {}}', encoding="utf-8"
+        )
+        (self.source_b / "global/opencode.json").write_text("{}", encoding="utf-8")
+        self.install_source(self.source_a)
+        current = self.read_config()
+        current["local_empty"] = {}
+        self.write_config(current)
+        self.install_source(self.source_b)
+        self.assertEqual(self.read_config(), {"empty": {}, "local_empty": {}})
+
+    def test_dry_run_lists_retirement_without_changes(self) -> None:
+        self.install_source(self.source_a)
+        (self.destination / "skills/old/SKILL.md").write_bytes(b"Local skill\n")
+        current = self.read_config()
+        current["agents"]["old"]["model"] = "SECRET_LOCAL_MODEL"
+        self.write_config(current)
+        before = snapshot(self.destination)
+        output = self.install_source(self.source_b, dry_run=True)
+        self.assertEqual(snapshot(self.destination), before)
+        for path in ("commands/xm-old.md", "skills/old/references/r.md", "mcp.servers.old", "plugins (-1)"):
+            self.assertEqual(output.count(path), 1)
+            self.assertTrue(any("Would remove" in line and path in line for line in output.splitlines()))
+        for path in ("skills/old/SKILL.md", "agents.old.model"):
+            self.assertEqual(output.count(path), 1)
+            self.assertTrue(any("Kept locally changed retired" in line and path in line for line in output.splitlines()))
+        self.assertNotIn("SECRET_LOCAL_MODEL", output)
+
+    def test_hard_coded_retirement_only_without_receipt(self) -> None:
+        retired = self.destination / "commands/sessions-move.md"
+        retired.parent.mkdir(parents=True)
+        retired.write_bytes(b"PR4 command\n")
+        local = retired.with_name("mine.md")
+        local.write_bytes(b"Local command\n")
+        self.install_source(self.source_b)
+        self.assertFalse(retired.exists())
+        self.assertEqual(local.read_bytes(), b"Local command\n")
+        backups = list((self.destination / "backups").glob("harness-*/commands/sessions-move.md"))
+        self.assertEqual([p.read_bytes() for p in backups], [b"PR4 command\n"])
+        retired.write_bytes(b"Recreated local command\n")
+        output = self.install_source(self.source_b, dry_run=True)
+        self.assertNotIn("sessions-move.md", output)
+        self.install_source(self.source_b)
+        self.assertEqual(retired.read_bytes(), b"Recreated local command\n")
+
+    def test_root_list_retirement_uses_equality_and_actual_removal_counts(self) -> None:
+        self.assertTrue(hasattr(install, "retire_settings"), "retire_settings interface is missing")
+        for key in ("plugins", "instructions", "skills"):
+            with self.subTest(key=key):
+                previous = {key: ["retired", {"package": "old", "options": {"enabled": True}}, "still-active", "deleted"]}
+                current = {key: ["retired", "retired", {"package": "old", "options": {"enabled": True}}, "local", "still-active"]}
+                incoming = {key: ["still-active", "new"]}
+                originals = copy.deepcopy((current, previous, incoming))
+                cleaned, removed, kept = install.retire_settings(current, previous, incoming)
+                self.assertEqual(cleaned, {key: ["local", "still-active"]})
+                self.assertEqual(removed, [f"{key} (-3)"])
+                self.assertEqual(kept, [])
+                self.assertEqual((current, previous, incoming), originals)
+                self.assertEqual(
+                    install.merge_settings(cleaned, incoming), {key: ["still-active", "new", "local"]}
+                )
+                self.assertEqual(install.retire_settings({key: ["old"]}, {key: ["old"]}, {}), ({}, [f"{key} (-1)"], []))
+                self.assertEqual(install.retire_settings({key: []}, {key: ["old"]}, {}), ({key: []}, [], []))
+                self.assertEqual(install.retire_settings({}, {key: ["old"]}, {}), ({}, [], []))
+
+    def test_settings_replacements_and_individually_retired_children(self) -> None:
+        self.assertTrue(hasattr(install, "retire_settings"), "retire_settings interface is missing")
+        previous = {
+            "agents": {"old": {"model": "old", "temperature": 1}},
+            "scalar": "old", "list": [1], "object": {"child": True},
+            "mcp": {"servers": {"active": {"url": "old", "enabled": True}}},
+        }
+        current = copy.deepcopy(previous)
+        current["agents"]["old"]["local"] = "keep"
+        incoming = {
+            "agents": {"old": {"model": "new"}},
+            "scalar": {"child": True}, "list": "new", "object": [],
+            "mcp": {"servers": {"active": {"type": "local", "command": ["new"]}}},
+        }
+        originals = copy.deepcopy((current, previous, incoming))
+        cleaned, removed, kept = install.retire_settings(current, previous, incoming)
+        self.assertNotIn("temperature", cleaned["agents"]["old"])
+        self.assertEqual(removed, ["agents.old.temperature", "mcp.servers.active.url", "mcp.servers.active.enabled"])
+        self.assertEqual(kept, [])
+        self.assertEqual((current, previous, incoming), originals)
+        self.assertEqual(install.merge_settings(cleaned, incoming), {
+            **incoming, "agents": {"old": {"model": "new", "local": "keep"}},
+        })
+
+    def test_dropped_settings_with_different_types_are_kept(self) -> None:
+        self.assertTrue(hasattr(install, "retire_settings"), "retire_settings interface is missing")
+        for previous, current in (({}, "local"), (["old"], {}), (True, 1), (None, "local"), (1, True)):
+            with self.subTest(previous=previous, current=current):
+                self.assertEqual(
+                    install.retire_settings({"old": current}, {"old": previous}, {}),
+                    ({"old": current}, [], ["old"]),
+                )
+        self.assertEqual(install.retire_settings({"old": None}, {"old": None}, {}), ({}, ["old"], []))
+        self.assertEqual(install.retire_settings({"old": "x"}, {"old": "x"}, {"old": None}), ({"old": "x"}, [], []))
+
+    def test_file_plan_skips_missing_and_active_paths_without_writes(self) -> None:
+        self.assertTrue(hasattr(install, "plan_file_retirement"), "plan_file_retirement interface is missing")
+        self.install_source(self.source_a)
+        (self.destination / "skills/old/references/r.md").unlink()
+        (self.destination / "skills/old/SKILL.md").write_bytes(b"Local skill\n")
+        previous = install.read_receipt(self.destination)
+        before = snapshot(self.destination)
+        self.assertEqual(
+            install.plan_file_retirement(self.destination, previous, set(install.managed_files(self.source_b))),
+            (["commands/xm-old.md"], ["skills/old/SKILL.md"]),
+        )
+        self.assertEqual(snapshot(self.destination), before)
+
+    def test_non_regular_retired_target_stops_before_writes(self) -> None:
+        self.install_source(self.source_a)
+        retired = self.destination / "commands/xm-old.md"
+        retired.unlink()
+        retired.mkdir()
+        before = snapshot(self.destination)
+        for dry_run in (False, True):
+            with self.subTest(dry_run=dry_run):
+                result = run_installer(self.source_b, "--destination", str(self.destination), *(["--dry-run"] if dry_run else []))
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn("xm-old.md", result.stderr)
+                self.assertNotIn("Traceback", result.stderr)
+                self.assertEqual(snapshot(self.destination), before)
+                self.assertTrue(retired.is_dir())
+
+    def test_unreadable_retired_target_stops_before_writes(self) -> None:
+        self.install_source(self.source_a)
+        before = snapshot(self.destination)
+        original = Path.read_bytes
+
+        def denied(path):
+            if path == self.destination / "commands/xm-old.md":
+                raise PermissionError("SECRET_READ_ERROR")
+            return original(path)
+
+        for dry_run in (False, True):
+            with self.subTest(dry_run=dry_run):
+                stdout, stderr = io.StringIO(), io.StringIO()
+                with mock.patch.object(Path, "read_bytes", denied), contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                    code = install.run_install(self.source_b, self.destination, dry_run=dry_run)
+                self.assertEqual(code, 1)
+                self.assertIn("xm-old.md", stderr.getvalue())
+                self.assertNotIn("SECRET_READ_ERROR", stdout.getvalue() + stderr.getvalue())
+                self.assertEqual(snapshot(self.destination), before)
+
+    def test_retirement_preserves_nonempty_local_folders_and_ignores_missing_files(self) -> None:
+        self.install_source(self.source_a)
+        missing = self.destination / "commands/xm-old.md"
+        missing.unlink()
+        local = self.destination / "skills/old/references/local.md"
+        local.write_bytes(b"Local reference\n")
+        output = self.install_source(self.source_b, dry_run=True)
+        self.assertNotIn("commands/xm-old.md", output)
+        self.install_source(self.source_b)
+        self.assertEqual(local.read_bytes(), b"Local reference\n")
+        self.assertFalse((local.parent / "r.md").exists())
+        self.assertFalse((self.destination / "skills/old/SKILL.md").exists())
+        self.assertFalse(missing.exists())
+
+    def test_file_plan_rejects_unsafe_paths(self) -> None:
+        self.install_source(self.source_a)
+        before = snapshot(self.destination)
+        receipt = install.Receipt("a" * 64, {"../outside": "b" * 64}, {})
+        with self.assertRaises(install.InstallError):
+            install.plan_file_retirement(self.destination, receipt, set())
+        self.assertEqual(snapshot(self.destination), before)
 
 
 if __name__ == "__main__":

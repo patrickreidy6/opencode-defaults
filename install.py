@@ -136,6 +136,52 @@ def merge_settings(
     return result
 
 
+def retire_settings(
+    current: dict[str, Any], previous: dict[str, Any], incoming: dict[str, Any]
+) -> tuple[dict[str, Any], list[str], list[str]]:
+    """Remove unchanged settings dropped by the baseline, retaining local edits."""
+    result = copy.deepcopy(current)
+    removed: list[str] = []
+    kept: list[str] = []
+
+    def walk(now: dict[str, Any], old: dict[str, Any], new: dict[str, Any], path: tuple[str, ...]) -> None:
+        for key, old_value in old.items():
+            if key not in now:
+                continue
+            value = now[key]
+            display = ".".join((*path, key))
+            dropped = key not in new
+            new_value = new.get(key)
+            atomic_retirement = path == ("mcp", "servers") and dropped
+            if not path and key in UNION_ROOT_LIST_KEYS and isinstance(value, list) and isinstance(old_value, list):
+                if dropped or isinstance(new_value, list):
+                    incoming_items = [] if dropped else new_value
+                    remaining = [item for item in value if item not in old_value or item in incoming_items]
+                    count = len(value) - len(remaining)
+                    if count:
+                        removed.append(f"{display} (-{count})")
+                        if remaining:
+                            now[key] = remaining
+                        else:
+                            del now[key]
+            elif not atomic_retirement and isinstance(value, dict) and isinstance(old_value, dict) and (
+                dropped or isinstance(new_value, dict)
+            ):
+                was_nonempty = bool(value)
+                walk(value, old_value, {} if dropped else new_value, (*path, key))
+                if was_nonempty and not value:
+                    del now[key]
+            elif dropped:
+                if type(value) is type(old_value) and value == old_value:
+                    del now[key]
+                    removed.append(display)
+                else:
+                    kept.append(display)
+
+    walk(result, previous, incoming, ())
+    return result, removed, kept
+
+
 def collect_files(repo_root: Path) -> list[tuple[Path, Path]]:
     files: list[tuple[Path, Path]] = [
         (repo_root / "global" / "AGENTS.md", Path("AGENTS.md")),
@@ -261,6 +307,24 @@ def read_receipt(destination: Path) -> Receipt | None:
     return Receipt(data["fingerprint"], data["files"], data["config"])
 
 
+def plan_file_retirement(destination: Path, receipt: Receipt, managed: set[str]) -> tuple[list[str], list[str]]:
+    removed: list[str] = []
+    kept: list[str] = []
+    for rel in sorted(receipt.files.keys() - managed):
+        target = destination / rel
+        try:
+            state = path_state(destination, rel)
+            if state is None:
+                continue
+            if not stat.S_ISREG(state.st_mode):
+                raise InstallError(f"{target}: expected a non-symlink regular retired file")
+            unchanged = sha256_file(target) == receipt.files[rel]
+        except (OSError, ValueError, UnicodeError):
+            raise InstallError(f"{target}: unable to inspect or read retired file safely") from None
+        (removed if unchanged else kept).append(rel)
+    return removed, kept
+
+
 def write_receipt(destination: Path, receipt: Receipt) -> None:
     data = {
         "format": RECEIPT_FORMAT,
@@ -371,23 +435,43 @@ def run_install(repo_root: Path, destination: Path, *, dry_run: bool) -> int:
             backup_rel = (backup_root.relative_to(destination) / rel).as_posix()
             path_state(destination, backup_rel)
 
-        # The existing PR4 retirement stage also mutates paths, so inspect it
-        # before writing config or copying any incoming managed files.
-        for rel_path in (*RETIRED_PR4_DIRS, *RETIRED_PR4_FILES):
-            active_path = destination / rel_path
-            state = path_state(destination, rel_path.as_posix())
-            if rel_path in RETIRED_PR4_DIRS and state is not None and stat.S_ISDIR(state.st_mode):
-                for child in active_path.rglob("*"):
-                    active_path = child
-                    child_rel = child.relative_to(destination)
-                    path_state(destination, child_rel.as_posix())
-                    path_state(destination, (backup_root.relative_to(destination) / child_rel).as_posix())
-            else:
-                path_state(destination, (backup_root.relative_to(destination) / rel_path).as_posix())
+        retired_files: list[str] = []
+        kept_files: list[str] = []
+        if previous is not None:
+            retired_files, kept_files = plan_file_retirement(destination, previous, set(files))
+            for rel in retired_files:
+                active_path = destination / rel
+                path_state(destination, (backup_root.relative_to(destination) / rel).as_posix())
+            # An old spelling can still name an incoming target on this filesystem.
+            # Its local edits follow the normal managed-file backup/replacement rule.
+            active_targets = [destination / rel for rel in files if (destination / rel).exists()]
+            local_files = []
+            for rel in kept_files:
+                active_path = destination / rel
+                if not any(active_path.samefile(target) for target in active_targets):
+                    local_files.append(rel)
+            kept_files = local_files
+        else:
+            # Bootstrap PR4 cleanup also mutates paths; validate it before writes.
+            for rel_path in (*RETIRED_PR4_DIRS, *RETIRED_PR4_FILES):
+                active_path = destination / rel_path
+                state = path_state(destination, rel_path.as_posix())
+                if rel_path in RETIRED_PR4_DIRS and state is not None and stat.S_ISDIR(state.st_mode):
+                    for child in active_path.rglob("*"):
+                        active_path = child
+                        child_rel = child.relative_to(destination)
+                        path_state(destination, child_rel.as_posix())
+                        path_state(destination, (backup_root.relative_to(destination) / child_rel).as_posix())
+                else:
+                    path_state(destination, (backup_root.relative_to(destination) / rel_path).as_posix())
 
         config_path = destination / "opencode.json"
         active_path = config_path
         current_cfg = read_config(config_path) if path_state(destination, "opencode.json") is not None else {}
+        retired_settings: list[str] = []
+        kept_settings: list[str] = []
+        if previous is not None:
+            current_cfg, retired_settings, kept_settings = retire_settings(current_cfg, previous.config, incoming_cfg)
         merged_cfg = merge_settings(current_cfg, incoming_cfg)
         merged_json = json.dumps(merged_cfg, indent=2) + "\n"
 
@@ -411,12 +495,20 @@ def run_install(repo_root: Path, destination: Path, *, dry_run: bool) -> int:
             ):
                 migrate_local_agents = True
 
+        for kind, removed, kept in (("file", retired_files, kept_files), ("setting", retired_settings, kept_settings)):
+            if dry_run:
+                for path in removed:
+                    print(f"[dry-run] Would remove retired {kind}: {path}")
+            for path in kept:
+                print(f"{'[dry-run] ' if dry_run else ''}Kept locally changed retired {kind}: {path}")
+
         if dry_run:
             print(f"[dry-run] Would install harness into {destination}")
             print(f"[dry-run] Would write merged {config_path}")
             if migrate_local_agents:
                 print(f"[dry-run] Would preserve existing custom AGENTS.md as {agents_local}")
-            prune_retired_pr4_assets(destination, backup_root, dry_run=True)
+            if previous is None:
+                prune_retired_pr4_assets(destination, backup_root, dry_run=True)
             for rel in files:
                 print(f"[dry-run] Would install {destination / rel}")
             print(f"[dry-run] Would write {destination / RECEIPT_NAME}")
@@ -432,7 +524,16 @@ def run_install(repo_root: Path, destination: Path, *, dry_run: bool) -> int:
             agents_local.write_text(existing_agents_text, encoding="utf-8", newline="\n")
 
         active_path = destination
-        prune_retired_pr4_assets(destination, backup_root, dry_run=False)
+        if previous is None:
+            prune_retired_pr4_assets(destination, backup_root, dry_run=False)
+        for rel in retired_files:
+            active_path = target = destination / rel
+            backup_file(target, Path(rel), backup_root)
+            target.unlink()
+            parent = target.parent
+            while parent != destination and parent.is_dir() and not any(parent.iterdir()):
+                parent.rmdir()
+                parent = parent.parent
         for rel, source in files.items():
             active_path = target = destination / rel
             backup_file(target, Path(rel), backup_root)
