@@ -86,7 +86,7 @@ sh ./install.sh --fingerprint
 - managed configuration differs, or `opencode.jsonc` exists in the destination;
 - the OpenCode CLI is missing or is not the version in `baseline.json`.
 
-**Configuration** matches when `merge_settings(installed, baseline) == installed`, without sorting lists. List order counts, including within `plugins`, `instructions`, and `skills`. Reinstall may reposition a local list entry; that placement is drift. Reuse the installer's `merge_settings` so check and install cannot disagree. That one rule also covers changed values, a missing or altered managed MCP server, legacy V1 keys the installer strips, and a second Superpowers reference.
+**Configuration** matches when `json_equal(merge_settings(installed, baseline), installed)`: structural comparison preserves JSON types and list order, without sorting lists or treating `true` as `1`. List order counts, including within `plugins`, `instructions`, and `skills`. Reinstall may reposition a local list entry; that placement is drift. Reuse the installer's `merge_settings` so check and install cannot disagree; existing root-array membership and merge behavior stay unchanged. That one rule also covers changed values, a missing or altered managed MCP server, legacy V1 keys the installer strips, and a second Superpowers reference.
 
 **Runtime:** run `opencode --version` with a short timeout, looking on `PATH` and then in the standalone install location `~/.opencode/bin`. Read the version as the official install script does: last word, leading `v` dropped. This checks the installed binary, not a server that is already running.
 
@@ -147,6 +147,8 @@ Tests use temporary directories with no credentials or network, and stub the CLI
 - usage errors and both wrappers.
 
 Verify with `uv run --no-project python -m unittest discover -s tests -v`. Before rollout, require Windows/Linux fixture fingerprint parity and an isolated install, check, edit, check run on both platforms: the first check passes with the pinned runtime and `Local none`, then the edited managed file is detected as drift. Keep SSH outside unit tests. A missing real Linux runtime or unavailable Linux host leaves acceptance pending; fake-CLI unit tests do not establish live runtime readiness.
+
+Patrick authorized a verification-only exception: download OpenCode 2.2.7 only into a temporary `workspace-smoke` acceptance directory and remove it afterward. This permits real Linux acceptance without a global install or a simulator runtime upgrade; acceptance remains pending until that check runs.
 
 ## Left to the builder
 

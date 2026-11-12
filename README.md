@@ -22,7 +22,7 @@ Domain-specific MCP servers, plugins, and skills stay out of this base harness s
 
 ## Install or Update
 
-Requires OpenCode V2 (`2.0.4+`), Git, and Python 3.10+ (or `uv`).
+Requires the exact OpenCode V2 version in [`baseline.json`](baseline.json) and Python 3.10+ (or `uv`). Git is needed only to clone the repository.
 
 ```sh
 git clone https://github.com/patrickreidy6/opencode-defaults.git
@@ -35,7 +35,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File ./install.ps1 -WhatIf
 powershell -NoProfile -ExecutionPolicy Bypass -File ./install.ps1
 ```
 
-On Windows, keep the standalone OpenCode CLI binary at `$HOME\.opencode\bin\opencode.exe` on your User `Path` (with Git for Windows installed) rather than unpacking `opencode.exe` into a custom folder such as `%LOCALAPPDATA%\Programs\OpenCodeCLI`. OpenCode only detects standalone `curl` installs at `~/.opencode/bin/opencode.exe`; custom paths skip CLI/TUI updates with `installation method not found`. After an OpenCode CLI upgrade, run `opencode service restart` from a new terminal so the background server switches to the updated binary.
+On Windows, keep the standalone OpenCode CLI binary at `$HOME\.opencode\bin\opencode.exe` on your User `Path` rather than unpacking `opencode.exe` into a custom folder such as `%LOCALAPPDATA%\Programs\OpenCodeCLI`. OpenCode only detects standalone `curl` installs at `~/.opencode/bin/opencode.exe`; custom paths skip CLI/TUI updates with `installation method not found`. After an OpenCode CLI upgrade, run `opencode service restart` from a new terminal so the background server switches to the updated binary.
 
 **Linux / Halo Docker Workspaces (`bash` / `sh`):**
 ```sh
@@ -43,20 +43,24 @@ sh ./install.sh --dry-run
 sh ./install.sh
 ```
 
-In `ops-infra` containers where `/home/builder` is persistent and `/home/builder/.local/bin` is on `PATH`, install OpenCode V2 and link its binary once per workspace:
+In `ops-infra` containers where `/home/builder` is persistent and `/home/builder/.local/bin` is on `PATH`, install the pinned OpenCode V2 version and link its binary once per workspace. Run from the selected defaults source directory (replace `python3` with `uv run --no-project python` if using `uv`):
 ```sh
-curl -fsSL https://opencode.ai/v2/install | bash
+version="$(python3 -c 'import json; print(json.load(open("baseline.json"))["opencode"])')"
+curl -fsSL https://opencode.ai/v2/install | bash -s -- --version "$version"
 ln -sf "$HOME/.opencode/bin/opencode" "$HOME/.local/bin/opencode"
 sh ./install.sh
 ```
 (`opencode upgrade` resolves symlinks via `realPath`, so `~/.local/bin/opencode -> ~/.opencode/bin/opencode` preserves automatic `curl` updates while working in non-login SSH shells.)
 
+A workspace without repository access receives an extracted archive of the selected commit from `ops-infra`. Installing, checking and fingerprinting that source need no `.git` metadata, credentials or network access; downloading the runtime is a separate step.
+
 ### Installer Behavior
 - Resolves destination to `--destination`, else `$XDG_CONFIG_HOME/opencode` (when absolute), else `~/.config/opencode`.
 - Deep-merges `opencode.json` objects and **unions root arrays** (`plugins`, `instructions`, `skills`). Previous repository-managed Superpowers Git references are replaced by the selected pin; other plugin entries and machine-local auth settings are preserved.
 - When `AGENTS.local.md` does not already exist, preserves any pre-existing custom `AGENTS.md` as `AGENTS.local.md` (loaded via `~/.config/opencode/AGENTS.local.md` in standard `~/.config/opencode` setups, and skipped silently when absent).
-- Copies `global/commands/*.md` into `<destination>/commands/`. Managed command names are replaced on update; other local commands are preserved.
-- Backs up overwritten files under `<destination>/backups/harness-<timestamp>/` and leaves unrelated files such as `service.json`, `cli.json`, and `commands/add-notes.md` untouched.
+- Copies `global/commands/*.md` into `<destination>/commands/`. The receipt tracks installed files and baseline settings: on the next install, unchanged retired content is removed with a backup; locally changed retired content is kept and named. Other local commands are preserved.
+- Writes `<destination>/opencode-defaults-receipt.json` after verifying the installed files. A missing receipt is bootstrap; an existing malformed, unreadable or unsupported receipt stops install and dry-run before writes. Restore a verified receipt from `<destination>/backups/harness-*/opencode-defaults-receipt.json`; if none exists, preserve the damaged receipt and reconcile ownership before deliberately bootstrapping without its retirement history.
+- Backs up overwritten or removed files under `<destination>/backups/harness-<timestamp>/` and leaves unrelated files such as `service.json`, `cli.json`, and `commands/add-notes.md` untouched.
 
 ### Superpowers Version and Cache
 
@@ -69,9 +73,37 @@ To upgrade Superpowers deliberately:
 1. Select and review an upstream revision, recording its full Git commit hash.
 2. Update the `#commit` in `global/opencode.json`, the `PINNED_SUPERPOWERS` fixture in `tests/test_install.py`, and the version note above.
 3. Run the [installer tests](#validation), then preview and apply the platform-specific installer using the commands under [Install or Update](#install-or-update).
-4. Run `opencode plugin list` and confirm Superpowers loads from the selected revision. Commit the tested defaults, pull them on other machines, and rerun the installer there.
+4. Run `opencode plugin list` and confirm Superpowers loads from the selected revision. Commit the tested defaults and record their fingerprint as described below. Deliver that source to other machines, rerun the installer, then run `--check --expect <fingerprint>` (`-Check -Expect <fingerprint>` in PowerShell).
 
 OpenCode's `opencode plugin update` skips full-commit pins. Moving the pin in this repository is what selects the next Superpowers revision; see [OpenCode's plugin documentation](https://opencode.ai/v2/docs/plugins).
+
+## Baseline and Check
+
+The baseline fingerprint is a SHA-256 of every copied source file, `global/opencode.json`, and `baseline.json`. Installer scripts, tests, docs and Git metadata are not inputs. Each check reads one source folder and one destination, without changing either.
+
+**Linux / Docker:**
+```sh
+sh ./install.sh --fingerprint
+sh ./install.sh --check
+sh ./install.sh --check --expect <fingerprint>
+```
+
+**Windows (PowerShell):**
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File ./install.ps1 -Fingerprint
+powershell -NoProfile -ExecutionPolicy Bypass -File ./install.ps1 -Check
+powershell -NoProfile -ExecutionPolicy Bypass -File ./install.ps1 -Check -Expect <fingerprint>
+```
+
+Replace `<fingerprint>` with the full 64-character value recorded for the selected baseline. `--fingerprint` prints the source identity without inspecting an installation. `--check` compares the destination's receipt, managed files, managed configuration and CLI version with the source beside the installer. `--check --expect` also requires that source to match the selected fingerprint; use the same expected value in both workspaces. Select an isolated or non-default destination with `--destination <path>` / `-Destination <path>` for install or check.
+
+Exit codes: **0** for a match (or successful install/fingerprint), **1** for any finding, install failure or operation that could not complete, and **2** for usage errors. `--expect` requires `--check`; check, fingerprint and dry-run modes cannot be combined. Fingerprinting does not accept a destination.
+
+`Local` lines name additions at the first unowned boundary: configuration key paths, extra-entry counts in root `plugins` / `instructions` / `skills` lists, local files under `agents/`, `commands/`, `skills/` and `plugins/`, and `AGENTS.local.md`. Nonempty unowned directories are named once without inspecting their trees; values and file contents are never printed. The Surface should show its workstation items; `sim-funds` and `sim-prime-broker` should show `Local none`. Local presence alone does not fail the check. Configuration comparison preserves JSON types and list order: a local list entry placed where reinstall would move it is drift.
+
+To change the baseline, edit the source, test it, commit it, then run `--fingerprint` from that clean selected commit. Record the commit, fingerprint and CLI version together in `ops-infra`, which delivers the source and runs `--check --expect` in each workspace. After any OpenCode upgrade, update `baseline.json` to the tested CLI version and follow this process; until then, upgraded machines report a runtime mismatch. For an existing runtime, `opencode upgrade <version>` selects the exact version from `baseline.json`.
+
+The check covers only the installed global baseline and CLI version, **not** the running server version, project or system overrides, environment substitutions, plugin loading, MCP connectivity, provider access or model behavior. It detects accidental drift and is **not tamper-proof**: the source and installer are writable by the workspace user.
 
 ## Model Defaults
 
