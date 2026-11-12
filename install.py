@@ -272,9 +272,16 @@ def path_state(destination: Path, rel: str, *, allow_leaf_link: bool = False) ->
         or any(part in ("", ".", "..") for part in rel.split("/"))
     ):
         raise ValueError("expected a canonical relative POSIX path")
+    return native_path_state(destination, Path(rel), allow_leaf_link=allow_leaf_link)
+
+
+def native_path_state(destination: Path, rel: Path, *, allow_leaf_link: bool = False) -> os.stat_result | None:
+    """Inspect native relative components, including names found by enumeration."""
+    if rel.anchor or not rel.parts or ".." in rel.parts:
+        raise ValueError("expected a contained native relative path")
 
     target = destination
-    parts = rel.split("/")
+    parts = rel.parts
     for index in range(len(parts) + 1):
         try:
             state = target.lstat()
@@ -452,18 +459,36 @@ def list_local_additions(
 
     prefixes = {rel[:index] for rel in managed for index, char in enumerate(rel) if char == "/"}
 
+    def inspected_states(paths: set[str]) -> list[os.stat_result]:
+        states = []
+        for rel in paths:
+            try:
+                state = path_state(destination, rel)
+            except (OSError, ValueError, RuntimeError):
+                # Invalid managed paths are reported by check; never infer an alias through a link.
+                continue
+            if state is not None:
+                states.append(state)
+        return states
+
+    managed_states = inspected_states(managed)
+    prefix_states = inspected_states(prefixes)
+
     def file_walk(rel: str, *, container: bool = False) -> None:
         if rel in managed:
             return
         target = destination / rel
         try:
-            state = path_state(destination, rel, allow_leaf_link=True)
+            state = native_path_state(destination, Path(rel), allow_leaf_link=True)
             if state is None:
                 return
             if stat.S_ISLNK(state.st_mode) or getattr(state, "st_reparse_tag", 0) == 0xA0000003:
                 additions.add(rel)
+            elif any(os.path.samestat(state, owned) for owned in managed_states):
+                return
             elif stat.S_ISDIR(state.st_mode):
-                if container or rel in prefixes:
+                # Filesystem identity handles preserved case without merging distinct names.
+                if container or rel in prefixes or any(os.path.samestat(state, owned) for owned in prefix_states):
                     for child in target.iterdir():
                         file_walk(f"{rel}/{child.name}")
                 elif next(target.iterdir(), None) is not None:

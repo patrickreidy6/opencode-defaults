@@ -938,6 +938,47 @@ class RetirementTests(unittest.TestCase):
                 receipt = json.loads((self.destination / install.RECEIPT_NAME).read_bytes())
                 self.assertIn("commands/xm-old.md", receipt["files"])
                 self.assertNotIn("commands/XM-Old.md", receipt["files"])
+                before = snapshot(self.destination)
+                checked = run_installer(
+                    source_b, "--destination", str(self.destination), "--check",
+                    env=cli_env(root, "2.2.7"),
+                )
+                self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
+                self.assertEqual(section(checked.stdout, "Local"),
+                                 ["Local commands/XM-Old.md"] if edited and not aliases else ["Local none"])
+                self.assertEqual(snapshot(self.destination), before)
+
+    def test_case_only_skill_ancestor_upgrade_reports_actual_local_paths(self) -> None:
+        for edited in (False, True):
+            with self.subTest(edited=edited), tempfile.TemporaryDirectory(dir=self.root) as tmp:
+                root = Path(tmp)
+                self.destination = root / "destination"
+                source_a = make_source(root / "source-a", {
+                    **DEFAULT_SOURCE, ".opencode/skills/Writer/SKILL.md": b"Old bytes\n",
+                })
+                source_b = make_source(root / "source-b", {
+                    **DEFAULT_SOURCE, ".opencode/skills/writer/SKILL.md": b"New bytes\n",
+                })
+                self.install_source(source_a)
+                old_dir = self.destination / "skills/Writer"
+                incoming = self.destination / "skills/writer/SKILL.md"
+                aliases = incoming.exists() and incoming.samefile(old_dir / "SKILL.md")
+                # Keep the directory's original spelling even when the old leaf is retired.
+                (old_dir / "local.md").write_bytes(b"SECRET_LOCAL\n")
+                if edited:
+                    (old_dir / "SKILL.md").write_bytes(b"SECRET_EDIT\n")
+                self.install_source(source_b)
+                self.assertEqual(incoming.read_bytes(), b"New bytes\n")
+                before = snapshot(self.destination)
+                checked = run_installer(
+                    source_b, "--destination", str(self.destination), "--check",
+                    env=cli_env(root, "2.2.7"),
+                )
+                self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
+                self.assertEqual(section(checked.stdout, "Local"),
+                                 ["Local skills/Writer/local.md"] if aliases else ["Local skills/Writer/"])
+                self.assertNotIn("SECRET_", checked.stdout)
+                self.assertEqual(snapshot(self.destination), before)
 
     def test_objects_emptied_by_removal_are_removed(self) -> None:
         self.assertEqual(
@@ -1523,6 +1564,26 @@ class CheckTests(InstalledFixture):
 
 
 class LocalTests(InstalledFixture):
+    @unittest.skipUnless(sys.platform.startswith("linux"), "Linux literal filename characters")
+    def test_linux_literal_local_names_match_without_writes(self) -> None:
+        files = ["commands/local:notes.md", r"commands/local\notes.md",
+                 "skills/demo/local:refs/private.md", r"skills/demo/local\refs/private.md"]
+        for rel in files:
+            path = self.destination / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"SECRET_LOCAL_CONTENT\n")
+        before = snapshot(self.root)
+        directories = {p: p.stat().st_mtime_ns for p in self.root.rglob("*") if p.is_dir()}
+        output = self.check("--expect", FIXTURE_FINGERPRINT)
+        self.assertEqual(section(output, "Local"), [
+            "Local commands/local:notes.md", r"Local commands/local\notes.md",
+            "Local skills/demo/local:refs/", "Local skills/demo/local\\refs/",
+        ])
+        self.assertEqual(section(output, "Result"), ["Result MATCH"])
+        self.assertNotIn("SECRET_", output)
+        self.assertEqual(snapshot(self.root), before)
+        self.assertEqual({p: p.stat().st_mtime_ns for p in self.root.rglob("*") if p.is_dir()}, directories)
+
     def test_config_reported_at_first_boundary(self) -> None:
         cfg = self.read_config()
         cfg["providers"] = {"openrouter": {"settings": {"apiKey": "secret-value"}}}
@@ -1591,10 +1652,13 @@ class LocalTests(InstalledFixture):
 
     def test_symlinked_directory_listed_not_followed(self) -> None:
         self.symlink(self.destination / "skills/loop", self.destination / "skills", directory=True)
+        self.symlink(self.destination / "skills/local-demo", self.destination / "skills/demo", directory=True)
+        self.symlink(self.destination / "commands/local-alias.md", self.destination / "skills/demo/SKILL.md")
         self.symlink(self.destination / "commands/broken", self.root / "missing")
         self.symlink(self.destination / "AGENTS.local.md", self.root / "missing")
         self.assertEqual(section(self.check(), "Local"), [
-            "Local AGENTS.local.md", "Local commands/broken", "Local skills/loop",
+            "Local AGENTS.local.md", "Local commands/broken", "Local commands/local-alias.md",
+            "Local skills/local-demo", "Local skills/loop",
         ])
 
     def test_symlink_replacing_unmanaged_scan_root(self) -> None:
