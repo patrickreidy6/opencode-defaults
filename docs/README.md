@@ -8,7 +8,7 @@ Maintained specs live in `specs/`, active plans in `plans/`, and completed plans
 |---|---|---|
 | [Baseline installation and verification](specs/baseline-verification-design.md) | [Baseline verification](plans/archive/2026-11-11-baseline-verification.md) | Complete; Windows/Linux acceptance and later regression results recorded in the spec. |
 | [Cross-model workflow](specs/cross-model-workflow-design.md) | [Initial cross-model commands](plans/archive/cross-model-commands.md) | Complete; initial approval came from the conversation named in the plan. The maintained spec includes later changes. |
-| [Project setup](specs/project-setup-design.md) | No separate retained plan | Skill implemented; the spec separately identifies pending Halo/Docker provisioning outside this repository. |
+| [Project setup](specs/project-setup-design.md) | No separate retained plan | Skill implemented; the spec distinguishes current setup behavior, per-workspace browser prerequisites and historical verification. |
 | Requirements in the plan's Contract | [Shared harness commands](plans/archive/2026-11-12-shared-harness-commands.md) | Complete; implementation, review, publication and workspace verification recorded in the plan. Related baseline spec is not its approval source. |
 | Conversation requirements retained in the plan's Spec field | [Pin Superpowers](plans/archive/pin-superpowers.md) | Complete; tests, local deployment and skill loading recorded in the plan. No separate spec was saved. |
 

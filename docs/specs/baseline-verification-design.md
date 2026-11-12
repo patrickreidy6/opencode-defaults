@@ -1,48 +1,78 @@
 # Baseline installation and verification
 
-**Workflow update, 2026-11-12:** this records the original offline baseline verifier and its historical acceptance. The current user workflow is [install once, inspect drift, receive updates](../../README.md#periodic-drift-and-update). The repo is public; central archive delivery and identical workspace/`Local none` expectations are superseded. Updates explicitly reset shared items with backups while retaining workspace-only and project additions. The receipt/fingerprint and offline check remain useful implementation components. The [completed baseline plan](../plans/archive/2026-11-11-baseline-verification.md) and [later shared-harness plan](../plans/archive/2026-11-12-shared-harness-commands.md) retain their approval and execution records.
-
-Approved for planning 2026-11-11, with the review amendments recorded under Decisions.
+**Status: Implemented; maintained through 2026-11-12.** The current workflow is install once, inspect drift, then receive public updates when requested in each workspace. This spec describes that workflow and its underlying installer, receipts and offline verifier. The [README](../../README.md#install-once-per-workspace) provides setup commands. The [completed baseline plan](../plans/archive/2026-11-11-baseline-verification.md) and [shared-harness plan](../plans/archive/2026-11-12-shared-harness-commands.md) retain their original approval and execution records; the latter is the approval source for the update workflow. Dated decisions and verification evidence are preserved below as history.
 
 ## Intent
 
-Install the same reviewed OpenCode defaults on every machine, starting with `sim-funds` and `sim-prime-broker`, and confirm it later with one command. Intentional project differences stay in each project's repository. This covers only the shared global baseline.
+Install shared OpenCode defaults in each machine/user environment or isolated workspace container. Projects using that environment inherit the global defaults. Workspace-only additions remain local; project-specific configuration, instructions and extensions stay in their owning repositories.
 
-This repo installs a baseline and checks one installation against it. `ops-infra` decides which baseline each workspace should hold, delivers the source, and runs the check. A workspace receives this portable baseline, never a workstation's merged personal configuration.
+Each workspace receives defaults directly from the public repository and chooses when to update. Workspaces may hold different published versions and different local additions. No central `ops-infra` baseline selection, archive delivery or fleet rollout is required. The shared source contains portable defaults, never a workstation's merged personal configuration.
 
 ## Goals and limits
 
 - One identity for a baseline that survives being copied anywhere.
-- A read-only check that passes only when an installation holds exactly that baseline.
-- Reinstalling converges: content an earlier baseline installed and the new one drops is cleaned up.
-- Local additions survive and never fail the check, unless placed where the installer would reorder them.
+- An informational drift report that distinguishes published changes, local edits and local additions without changing the installed harness.
+- An explicit update that replaces shared items, removes retired shared items and preserves workspace-only additions, with backups before overwriting or removing existing files.
+- An offline check that passes only when the managed baseline and CLI match the selected source. Passing the same `--expect` fingerprint in two workspaces establishes the same baseline; selecting the same version everywhere is optional.
+- Local additions survive and never fail the offline check merely by being present. A list placement the installer would reorder is a configuration finding.
+- Reports show paths, setting names and statuses, never local setting values or file contents.
 
-The change has failed, even if it runs, when:
+The Python implementation uses the standard library. `install.ps1` and `install.sh` remain convenience launchers for `install.py`; direct Python invocation is also supported. Given a local source copy and Python, ordinary install, fingerprint and check need no Git metadata, credentials or network. The public drift/update workflow requires Git and network access to refresh its source; provider sign-ins remain separate.
 
-- the check passes while two workspaces hold different managed content;
-- the check fails on legitimate local additions, so its result gets ignored;
-- the installer removes or overwrites something without a backup;
-- installing or checking needs Git metadata, credentials, or network access;
-- output reveals local setting values or file contents.
+Out of scope: automatic fleet rollout, sending local changes upstream, machine-readable reports, and proving effective runtime equivalence across project/system overrides, plugins, MCPs or providers. The `project-setup` skill bootstraps or reuses the global harness; it does not automatically run the offline verifier.
 
-Constraints: Python standard library only, the existing PowerShell and `sh` wrappers, and current installer behavior preserved.
+## Current workflow
 
-Out of scope: delivering the source to workspaces, the `ops-infra` baseline record, machine-readable output, OpenCode's update prompts, and using the check inside the `project-setup` skill.
+### Install once
 
-## Approaches
+Use Git and Python 3.10+ (or `uv`). Clone `https://github.com/patrickreidy6/opencode-defaults.git` into `~/.local/share/opencode-defaults`, outside project repositories. No GitHub account or token is needed to download the defaults. Keep this clone as a clean upstream cache; author and publish improvements from a separate development checkout.
 
-- **Selected: installation receipt plus read-only check.** Records what was installed and compares the actual installation with it. A small extension to the existing installer serves manual use and later `ops-infra` checks. Patrick chose this.
-- **Considered: pinned commit plus manual checklist.** Less code, but cannot detect edits made after installation.
-- **Identity by content, not by commit.** The first draft identified a baseline by its Git commit. This repository is private, and `ops-infra`'s last recorded validation found no Git credentials in the sim builders. Their source will arrive as an archive or copy without Git metadata, so a commit-based check could never pass there. A fingerprint of the content works however the source arrives. Approved after review on 2026-11-11.
+Read the CLI pin from that source's `baseline.json` and install the OpenCode runtime before applying the defaults. From the source directory, preview and install with `./install.ps1 -WhatIf` then `./install.ps1` on Windows, or `sh ./install.sh --dry-run` then `sh ./install.sh` on POSIX. The [README](../../README.md#install-once-per-workspace) gives full platform commands, including Windows execution-policy handling. `uv run --no-project python install.py` is a cross-platform alternative; it accepts `--dry-run` for the preview.
+
+The installer creates the receipt and global slash commands. Connect providers separately in that environment. Additional projects reuse the installed global harness; do not copy the defaults into every repository.
+
+### Inspect drift and receive updates
+
+Run `/shared-harness-drift` and `/shared-harness-update` as separate OpenCode submissions, with no arguments. Their launchers create the dedicated public source cache if absent, then run `shared_harness.py`. Both require an existing valid installation receipt; they do not replace first-time installation.
+
+The driver requires the cache to be a Git clone on `main`, with the expected public `origin` and no tracked or untracked changes. It fetches public `main`, permits only a fast-forward, and runs the newly fetched driver and installer. It stops on local commits or divergent history rather than resetting them. Neither command pushes changes or updates another workspace.
+
+`/shared-harness-drift` refreshes only that source cache and reports:
+
+- **Upstream:** shared files/settings added, changed or removed since the installation receipt.
+- **Workspace:** shared files/settings edited or removed locally since the receipt.
+- **Local:** workspace-only global additions at the first unowned boundary.
+- **Project:** applicable project/ancestor instructions, configuration and `.opencode` extensions. This is an inventory, not a comparison of effective settings.
+- **Runtime:** the installed CLI version and published pin.
+
+Differences are informational: a completed report exits successfully even when they exist. Installed and project files remain unchanged. Unlike the offline `--check`, this command fetches upstream and does not treat baseline differences as failures.
+
+`/shared-harness-update` applies the fetched public version in the current workspace:
+
+1. Validate the receipt and run the installer's dry-run preflight with shared-item reset enabled.
+2. Probe the CLI. If it differs from the fetched pin, run `opencode upgrade <version>` and verify the resulting version. A missing CLI requires first-time runtime setup.
+3. Install with `reset_shared=True`: back up and replace shared items, retire previously managed items even when edited, and preserve workspace-only additions and project files.
+4. Verify the installed files and merged configuration, write the new receipt, then run `opencode reload`.
+
+If the CLI binary changes, the command asks for `opencode service restart` from a terminal; it does not terminate the service running its own session. A failed later step can leave a changed CLI or partially applied files. A reload failure occurs after installation and receipt publication. Report the completed stage and failure; there is no automatic rollback.
+
+The equivalent terminal commands, run from the active project, are:
+
+```sh
+python3 "$HOME/.local/share/opencode-defaults/shared_harness.py" drift --project .
+python3 "$HOME/.local/share/opencode-defaults/shared_harness.py" update
+```
+
+Use `uv run --no-project python` on Windows or wherever preferred. `--destination` selects another configuration directory, but an update still operates on the current user's CLI and reloads OpenCode. It does not isolate the runtime.
 
 ## Baseline identity
 
-A baseline is every file the installer copies, plus `global/opencode.json` and a new `baseline.json`.
+A baseline is every file the installer copies, plus `global/opencode.json` and `baseline.json`.
 
-- `baseline.json` sits at the repository root and names the exact OpenCode CLI version the baseline was tested with: `{"opencode": "2.2.7"}`. That is the version on the Surface on 2026-11-11; whether it suits the Halo containers is a rollout check. Model defaults and the Superpowers pin stay in `global/opencode.json`. Every mode stops before changing anything when `baseline.json` is missing or malformed.
-- The **fingerprint** is one SHA-256 over the sorted list of every input's path and content hash. Take the file list from the installer's own `collect_files`, so the fingerprint and the installer cannot disagree about what is managed. The installer scripts are not inputs.
-- Add `eol=lf` to the `* text=auto` rule in `.gitattributes` so every checkout, archive, and copy carries the same bytes, and assert in a test that no input contains CRLF. Tested in a scratch copy on 2026-11-11: a checkout and an extracted `git archive` produced the same fingerprint, and simulating `core.autocrlf=true` changed every file until `eol=lf` was set.
-- `--fingerprint` prints the source copy's fingerprint and exits. The commit stays the label people use: `ops-infra` records commit, fingerprint, and CLI version together when it selects a baseline. The installer never reads Git metadata.
+- [`baseline.json`](../../baseline.json) names the exact CLI pin; read the selected source's file instead of copying a version from historical evidence below. Model defaults and the Superpowers pin stay in `global/opencode.json`. Every installer mode validates `baseline.json` before changing installed files. The update driver may already have refreshed its source cache before this validation.
+- The **fingerprint** is one SHA-256 over the sorted list of every input's path and content hash. It uses the installer's `collect_files` list, so fingerprinting and installation agree on managed files. Installer/driver scripts, tests, docs and Git metadata are not inputs.
+- `.gitattributes` sets `* text=auto eol=lf` to keep source bytes consistent across platforms; a test rejects CRLF in fingerprint inputs.
+- `--fingerprint` prints the local source's fingerprint and exits. The updater also reports the fetched commit as a source label. Fingerprints and receipts remain independent of Git metadata, so offline verification still works with an extracted archive or copy.
 
 ## Installation receipt
 
@@ -53,20 +83,29 @@ A successful install writes `opencode-defaults-receipt.json` in the destination.
 - each installed file's destination-relative path and SHA-256;
 - a copy of the baseline's `global/opencode.json`, which is repository content, never the merged machine configuration.
 
-Write it last. Re-read each installed file, confirm its hash, then replace the receipt in one step. On any failure, exit nonzero and leave the previous receipt alone. Back up the previous receipt with the other overwritten files. Before trusting a receipt, validate its structure and that every path is relative and stays inside the destination.
+The installer writes it last, after re-reading installed files to confirm their hashes and verifying the merged configuration. It backs up the previous receipt, then atomically replaces it. An install failure before that replacement leaves the previous receipt in place, but earlier file changes are not rolled back. The update driver's later reload can fail after the new receipt has been published. Before trusting a receipt, validate its structure and that every path is relative and stays inside the destination.
 
 A missing receipt is bootstrap. An existing malformed, unreadable or unsupported receipt stops install and dry-run before any writes. Name the receipt path and a safe reason, then give recovery guidance: restore a verified receipt from `<destination>/backups/harness-*/opencode-defaults-receipt.json`. If no valid backup exists, preserve the damaged receipt and reconcile ownership manually before deliberately bootstrapping without it; automatic retirement history will be lost. Never automatically delete or replace the invalid receipt.
 
-Dry-run writes nothing. Destination resolution, merging, backups, the `AGENTS.local.md` migration, and the refusal when `opencode.jsonc` exists are unchanged. Installing does not inspect the runtime.
+An ordinary installer dry-run writes nothing. The destination is `--destination`, otherwise absolute `$XDG_CONFIG_HOME/opencode`, otherwise `~/.config/opencode`. Backups live under `<destination>/backups/harness-<timestamp>/`. An existing `opencode.jsonc` stops installation until reconciled with `opencode.json`.
+
+The installer merges shared settings while preserving unrelated local settings and files. Existing `AGENTS.local.md` remains local. Ordinary installation can preserve a pre-existing custom `AGENTS.md` as `AGENTS.local.md` when that file is absent. During a shared reset, edits to receipt-owned `AGENTS.md` are backed up and replaced, without migrating those edits into active local instructions.
+
+Ordinary `install.py` does not inspect or change the CLI runtime. The offline check probes it; the update driver probes and applies the selected pin before installation.
 
 ## Retired content
 
-The receipt records what the previous baseline installed. On reinstall, for anything it installed that the new baseline no longer ships:
+The receipt records what the previous baseline installed. Retirement differs between ordinary reinstall and explicit shared update:
 
-- **Untouched: remove it.** A file is untouched when its hash still matches the receipt, a setting when its value still equals the previous baseline's. Files go to the backup first, and directories left empty are removed. `opencode.json` is already backed up on every run.
-- **Changed locally: keep it.** It becomes a local addition, and the installer names it once in its output.
+| Content affected by retirement | Ordinary `install.py` | `/shared-harness-update` |
+|---|---|---|
+| Untouched file or setting | Remove with backup | Remove with backup |
+| Locally edited file or setting | Keep as a local addition and name it, unless the incoming baseline owns/replaces it through another path or definition | Remove with backup |
+| Unowned workspace-only addition | Preserve | Preserve |
 
-A setting follows the merge rules: a value in `global/opencode.json`, an entry in `plugins`, `instructions`, or `skills`, or a whole `mcp.servers` definition. Objects left empty by a removal are removed too.
+A file is untouched when its hash matches the receipt; a setting is untouched when it equals the previous baseline value. Removed files are backed up first, and empty parent directories are removed. The merged `opencode.json` has its own backup.
+
+Configuration ownership follows the merge rules. Each shared `mcp.servers` definition is atomic: an incoming definition replaces the whole server definition. Root `plugins`, `instructions` and `skills` arrays track membership by value. Values present in the old baseline and dropped by the new one are removed; additional local values survive in both modes. Empty objects left by retirement are removed. Shared content still present in the incoming baseline is replaced in both modes, even when edited locally; the preservation rule above applies to retired content.
 
 Dry-run lists what would be removed. An installation without a receipt has nothing to compare, so the first receipt-writing install removes only what the existing hard-coded retired lists name. Those lists stay for such older installs; later retirements need no code change.
 
@@ -78,12 +117,12 @@ sh ./install.sh --check --expect <fingerprint>
 sh ./install.sh --fingerprint
 ```
 
-`install.ps1` offers the same three modes. `--destination` selects the installation to check, as it does for installing.
+`install.ps1` offers the same three modes as `-Check`, `-Check -Expect <fingerprint>` and `-Fingerprint`. `--destination` (`-Destination` in PowerShell) selects the installation to check, as it does for installing. Supply a full 64-character fingerprint for `--expect`. This is the offline verifier; `/shared-harness-drift` is the normal informational workflow.
 
 `--check` compares one installation with the source copy beside the installer and changes nothing. It reports a finding when:
 
 - the source copy's fingerprint is not the one given to `--expect`;
-- there is no valid receipt, or its fingerprint differs from the source copy's;
+- there is no valid receipt, or its fingerprint, managed-file hashes or baseline configuration differ from the source copy's;
 - a managed file is missing or differs from the source;
 - managed configuration differs, or `opencode.jsonc` exists in the destination;
 - the OpenCode CLI is missing or is not the version in `baseline.json`.
@@ -92,13 +131,13 @@ sh ./install.sh --fingerprint
 
 **Runtime:** run `opencode --version` with a short timeout, looking on `PATH` and then in the standalone install location `~/.opencode/bin`. Read the version as the official install script does: last word, leading `v` dropped. This checks the installed binary, not a server that is already running.
 
-**Local additions** are listed at the first unowned boundary: configuration key names by key path, counts for extra entries in the root `plugins`, `instructions`, and `skills` lists, local files under `agents/`, `commands/`, `skills/`, and `plugins/`, and `AGENTS.local.md`. Stop at an unowned configuration key rather than inspecting its values. Treat the four directory roots as containers and walk deeper only along prefixes containing managed paths. List each nonempty unowned directory once, without descending its tree; skip directly empty directories. Names only, never values or contents. Print one plain, sorted `Local <item>` line per item, or `Local none` when there are no additions. Local presence alone is never a finding; a list placement that reinstall would change is a configuration finding. Surface additions are expected; `sim-funds` and `sim-prime-broker` should show `Local none`.
+**Local additions** are listed at the first unowned boundary: configuration key names by key path, counts for extra entries in the root `plugins`, `instructions`, and `skills` lists, local files under `agents/`, `commands/`, `skills/`, and `plugins/`, and `AGENTS.local.md`. Stop at an unowned configuration key rather than inspecting its values. Treat the four directory roots as containers and walk deeper only along prefixes containing managed paths. List each nonempty unowned directory once, without descending its tree; skip directly empty directories. Names only, never values or contents. Print one plain, sorted `Local <item>` line per item, or `Local none` when there are no additions. Local presence alone is never a finding; a list placement that reinstall would change is a configuration finding. Every workspace may have local additions; `Local none` is not a rollout requirement.
 
 **Exit codes:** `0` match; `1` any finding, or a check that could not complete; `2` usage error, such as `--expect` without `--check`, `--check` with `--dry-run`, or a malformed fingerprint.
 
 Two properties to hold in tests: the check passes right after a successful install when the pinned CLI is present, and whenever the check passes, reinstalling changes no managed file or setting.
 
-Illustrative output. Wording and layout are the builder's; the sections are not.
+Illustrative output, with the fingerprint abbreviated for readability:
 
 ```text
 $ sh ./install.sh --check --expect 3f9c1a7e...
@@ -115,48 +154,34 @@ Result       DRIFT, 2 findings
 
 ### What a pass means
 
-Without `--expect`: this installation matches this source copy. With `--expect`: it holds the selected baseline, so the same expected value passing in both workspaces means they hold the same baseline.
+Without `--expect`: this installation matches this source copy. With `--expect`: it holds the selected baseline, so the same expected value passing in both workspaces means they hold the same baseline. Different workspaces can choose different versions; neither invocation checks whether the local source is the newest public version.
 
-A pass does not cover project or system overrides, environment substitutions, plugin loading, MCP connectivity, provider access, or model behavior. The check detects accidental drift and is not tamper-proof: the source copy and installer sit in the builder's writable home. Say so in the output and README.
-
-## How ops-infra uses it
-
-Not built here. This is the interface it relies on.
-
-1. On the Surface, with the reviewed commit checked out and no uncommitted changes, run `--fingerprint` and record commit, fingerprint, and CLI version.
-2. Deliver that source to each workspace by whatever route `ops-infra` chooses.
-3. In each workspace, install the pinned CLI, run the installer, and connect providers by hand.
-4. Run `--check --expect <fingerprint>` in each workspace with its other checks.
+A pass does not cover the running server version, project or system overrides, environment substitutions, plugin loading, MCP connectivity, provider access, or model behavior. The check detects accidental drift and is not tamper-proof: the source copy and installer are writable by the workspace user.
 
 ## Files and verification
 
-Add `baseline.json`. Change `install.py`, `install.ps1`, `.gitattributes`, `tests/test_install.py`, `README.md`, the root `AGENTS.md`, and `.opencode/skills/project-setup/SKILL.md`. `install.sh` already forwards arguments.
+[`install.py`](../../install.py) owns installation, merging, receipts, fingerprints and offline verification. [`install.ps1`](../../install.ps1) and [`install.sh`](../../install.sh) find Python/`uv` and forward options. [`shared_harness.py`](../../shared_harness.py) owns source refresh, drift reporting and updates; the two [`global/commands/`](../../global/commands/) prompts launch it. The [`project-setup` skill](../../.opencode/skills/project-setup/SKILL.md) reads the source pin, sets up or reuses the harness, and keeps project additions local.
 
-`project-setup` reads the exact OpenCode version from the defaults source's `baseline.json` instead of requiring `2.0.4+`. Automatic use of the check inside the skill remains out of scope.
+Maintain the README and this spec alongside behavior changes. Publish tested changes from the development checkout to `main`; each workspace receives them only when its update command is invoked. Change `baseline.json` deliberately to select a new CLI pin. A CLI version that differs from the selected source causes the offline check to fail; the updater applies the fetched source's pin. Receipts handle subsequent retirement of managed content without adding entries to the legacy hard-coded lists.
 
-README: installing the runtime at the pinned version (the official install script accepts `--version`, and `opencode upgrade <version>` covers an existing install), how a workspace without repository access gets the source, the three modes, how to change the baseline, retirement in place of today's "managed command names are replaced on update" note, and the limits above. Upgrading the runtime means bumping `baseline.json`; until then the check fails on any machine that upgraded, including the Surface.
-
-`docs/cross-model-workflow-design.md` tells maintainers to add a removed command to `RETIRED_PR4_FILES`. Update that note: the receipt now handles it.
-
-Sequencing done: the `/xm-*` commands work has been committed; all five `global/commands/xm-*.md` files are tracked.
-
-Tests use temporary directories with no credentials or network, and stub the CLI probe so they do not depend on an installed OpenCode. Cover:
+Tests in `tests/test_install.py`, `tests/test_baseline.py` and `tests/test_shared_harness.py` use temporary directories, local Git fixtures and fake CLI behavior without credentials or network. Coverage includes:
 
 - fingerprint: stable, changes with any input, equal for a copy without `.git`, and a fixed fixture yields a recorded value so the format cannot change silently;
 - install: receipt written, repeat install stable, dry-run writes nothing, failed verification keeps the old receipt, an existing malformed/unreadable/unsupported receipt stops install and dry-run before writes;
-- retirement: untouched file and setting removed with a backup, changed ones kept and named;
+- retirement: ordinary reinstall preserves edited retired content; shared reset removes it with backups; local additions and value-based array membership remain protected;
 - check: passes after install, one case per finding, local additions listed at the first unowned boundary without values and not failing on presence alone, list placement that reinstall would change reported as drift, `--expect` match and mismatch, destination unchanged by the check;
-- usage errors and both wrappers.
+- usage errors and both wrappers;
+- drift/update: clean-source refresh and freshly fetched code execution, dirty/diverged-source refusal, upstream versus workspace differences, project inventory, no remote mutation, and explicit upgrade/reload failures.
 
-Verify with `uv run --no-project python -m unittest discover -s tests -v`. Before rollout, require Windows/Linux fixture fingerprint parity and an isolated install, check, edit, check run on both platforms: the first check passes with the pinned runtime and `Local none`, then the edited managed file is detected as drift. Keep SSH outside unit tests. A missing real Linux runtime or unavailable Linux host leaves acceptance pending; fake-CLI unit tests do not establish live runtime readiness.
-
-Patrick authorized a verification-only exception: download OpenCode 2.2.7 only into a temporary `workspace-smoke` acceptance directory and remove it afterward. Task 8 exercised this permission and completed real Linux acceptance without a global install or a simulator runtime upgrade; results are recorded under Verified below.
-
-## Left to the builder
-
-Receipt field names, output wording, how the wrappers pass options, internal structure, and the timeout value.
+After installer changes, run `uv run --no-project python -m unittest discover -s tests -v` and an install followed by `--check` against an isolated `--destination`, as required by the repository instructions. For portability or runtime changes, also verify the affected behavior on Windows and Linux; keep SSH outside unit tests. Use an isolated runtime environment when exercising the updater, since `--destination` isolates only configuration. Fake-CLI tests do not establish live runtime, provider or plugin readiness.
 
 ## Decisions
+
+### Original baseline decisions — 2026-11-11
+
+The following is the original decision record. At that time the repository was private and the proposed delivery route used archives without Git metadata. Those access and central-rollout assumptions were superseded by the public workflow on 2026-11-12; they are not current requirements. Ordinary reinstall retains its original retirement behavior, while explicit shared update uses the reset behavior documented above.
+
+The selected approach was an installation receipt plus a read-only check. A pinned commit plus a manual checklist was considered, but would not detect edits after installation. Content identity kept verification independent of the source-delivery route and remains useful with public Git clones.
 
 Patrick's: receipt plus check command; then, after review on 2026-11-11, the content fingerprint, `--expect`, the pinned runtime, and removing retired files.
 
@@ -171,6 +196,8 @@ Calls made while revising, confirmed with planning approval:
 Three `/xm-spec-review` reports on 2026-11-11 led to the amendments above. Patrick accepted trimmed #1 (Local reporting at the first unowned boundary) and #2–#5 (ordered merge comparison, `project-setup` reading the exact version from `baseline.json`, Windows/Linux acceptance before rollout, and stopping before writes on an existing invalid receipt).
 
 ## Verified
+
+The dated records below preserve the original acceptance and regression evidence, including source hashes, commands and then-current rollout assumptions. They do not describe today's workspace state or authorize new deployments. The later [shared-harness verification and deployment record](../plans/archive/2026-11-12-shared-harness-commands.md#verification-and-deployment-record) records publication and the public update workflow's acceptance.
 
 ### Windows and Linux acceptance — 2026-11-11
 
