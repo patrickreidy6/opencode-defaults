@@ -1,6 +1,9 @@
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
-    [string]$Destination = ''
+    [string]$Destination = '',
+    [switch]$Check,
+    [switch]$Fingerprint,
+    [string]$Expect = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -10,6 +13,16 @@ if ($Destination -ne '') {
 }
 if ($WhatIfPreference) {
     $InstallerArgs += '--dry-run'
+}
+if ($Check) {
+    $InstallerArgs += '--check'
+}
+if ($Fingerprint) {
+    $InstallerArgs += '--fingerprint'
+}
+if ($PSBoundParameters.ContainsKey('Expect')) {
+    # Keep empty pins as one native argument in Windows PowerShell 5.1.
+    $InstallerArgs += "--expect=$Expect"
 }
 
 if (Get-Command uv -ErrorAction SilentlyContinue) {

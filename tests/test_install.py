@@ -13,6 +13,10 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 INSTALL_PY = REPO_ROOT / "install.py"
 SUPERPOWERS_PACKAGE = "superpowers@git+https://github.com/obra/superpowers.git"
 PINNED_SUPERPOWERS = SUPERPOWERS_PACKAGE + "#22f0b463e7a5e579904dd6211a520321035526f7"
+GIT_SH = Path(r"C:\Program Files\Git\bin\sh.exe")
+SH_EXE = shutil.which("sh") or (
+    str(GIT_SH) if sys.platform == "win32" and GIT_SH.is_file() else None
+)
 
 
 class InstallHarnessTests(unittest.TestCase):
@@ -296,7 +300,8 @@ class InstallHarnessTests(unittest.TestCase):
         self.assertEqual(merged["plugins"], ["custom-plugin", SUPERPOWERS_PACKAGE])
         self.assertEqual(merged["instructions"], ["custom-rules.md", SUPERPOWERS_PACKAGE])
 
-    def test_wrappers_ps1_and_sh(self) -> None:
+    @unittest.skipUnless(sys.platform == "win32", "Windows PowerShell")
+    def test_ps1_wrapper(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             ps_dest = Path(tmp) / "ps-dest"
             ps_whatif = subprocess.run(
@@ -338,18 +343,19 @@ class InstallHarnessTests(unittest.TestCase):
             self.assertEqual(ps_run.returncode, 0, ps_run.stderr)
             self.assertTrue((ps_dest / "opencode.json").is_file())
 
-            sh_exe = shutil.which("sh") or r"C:\Program Files\Git\bin\sh.exe"
-            if Path(sh_exe).exists():
-                sh_dest = Path(tmp) / "sh-dest"
-                sh_run = subprocess.run(
-                    [sh_exe, "./install.sh", "--destination", sh_dest.as_posix()],
-                    cwd=REPO_ROOT,
-                    text=True,
-                    capture_output=True,
-                    check=False,
-                )
-                self.assertEqual(sh_run.returncode, 0, sh_run.stderr)
-                self.assertTrue((sh_dest / "opencode.json").is_file())
+    @unittest.skipUnless(SH_EXE, "POSIX shell unavailable")
+    def test_sh_wrapper(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            sh_dest = Path(tmp) / "sh-dest"
+            sh_run = subprocess.run(
+                [SH_EXE, "./install.sh", "--destination", sh_dest.as_posix()],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(sh_run.returncode, 0, sh_run.stderr)
+            self.assertTrue((sh_dest / "opencode.json").is_file())
 
     def test_bom_tolerance_nested_list_replacement_and_retired_pr4_cleanup(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

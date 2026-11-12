@@ -17,6 +17,10 @@ from unittest import mock
 import install
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+GIT_SH = Path(r"C:\Program Files\Git\bin\sh.exe")
+SH_EXE = shutil.which("sh") or (
+    str(GIT_SH) if sys.platform == "win32" and GIT_SH.is_file() else None
+)
 DEFAULT_SOURCE: dict[str, bytes] = {
     "baseline.json": b'{"opencode": "2.2.7"}\n',
     "global/AGENTS.md": b"# Test defaults\n",
@@ -1617,6 +1621,128 @@ class LocalTests(InstalledFixture):
         output = self.check()
         self.assertEqual(section(output, "Local"), ["Local commands/xm-old.md"])
         self.assertNotIn("SECRET_EDIT", output)
+
+
+class WrapperTests(unittest.TestCase):
+    def setUp(self) -> None:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.env = cli_env(self.root, "2.2.7", isolate=False)
+
+    def run_wrapper(self, *args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            args, cwd=REPO_ROOT, env=self.env, text=True, capture_output=True, check=False
+        )
+
+    def assert_check_result(self, result: subprocess.CompletedProcess[str], code: int) -> None:
+        self.assertEqual(result.returncode, code, result.stderr + result.stdout)
+        if code == 0:
+            self.assertEqual(section(result.stdout, "Result"), ["Result MATCH"])
+            self.assertEqual(result.stderr, "")
+        elif code == 1:
+            self.assertTrue(any(line.startswith("Result DRIFT") for line in section(result.stdout, "Result")))
+        else:
+            self.assertIn("usage:", result.stderr)
+            self.assertNotIn("Result MATCH", result.stdout)
+
+    @unittest.skipUnless(sys.platform == "win32", "Windows PowerShell")
+    def test_ps1_modes(self) -> None:
+        command = [
+            "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+            str(REPO_ROOT / "install.ps1"),
+        ]
+        expected = run_installer(REPO_ROOT, "--fingerprint", env=self.env)
+        self.assertEqual(expected.returncode, 0, expected.stderr)
+        fingerprint = self.run_wrapper(*command, "-Fingerprint")
+        self.assertEqual(fingerprint.returncode, 0, fingerprint.stderr)
+        self.assertEqual(fingerprint.stdout, expected.stdout)
+        self.assertEqual(fingerprint.stderr, "")
+        pin = expected.stdout.strip()
+
+        destination = self.root / "ps destination"
+        preview = self.run_wrapper(*command, "-Destination", str(destination), "-WhatIf")
+        self.assertEqual(preview.returncode, 0, preview.stderr)
+        self.assertFalse(destination.exists())
+        installed = self.run_wrapper(*command, "-Destination", str(destination))
+        self.assertEqual(installed.returncode, 0, installed.stderr)
+        self.assertTrue((destination / "opencode.json").is_file())
+        before = snapshot(destination)
+        empty = self.root / "empty"
+        empty.mkdir()
+
+        cases = (
+            ("pinned match", destination, ["-Check", "-Expect", pin], 0),
+            ("wrong pin", destination, ["-Check", "-Expect", "0" * 64], 1),
+            ("omitted pin", destination, ["-Check"], 0),
+            ("empty destination", empty, ["-Check"], 1),
+            ("pin without check", destination, ["-Expect", pin], 2),
+            ("empty pin via CLI", destination, ["-Check", "-Expect", ""], 2),
+            ("whitespace pin", destination, ["-Check", "-Expect", "   "], 2),
+            ("check with whatif", destination, ["-Check", "-WhatIf"], 2),
+            ("fingerprint with destination", destination, ["-Fingerprint"], 2),
+        )
+        for name, target, args, code in cases:
+            with self.subTest(case=name):
+                result = self.run_wrapper(*command, "-Destination", str(target), *args)
+                self.assert_check_result(result, code)
+                if name in ("empty pin via CLI", "whitespace pin"):
+                    self.assertIn("--expect must contain exactly 64 hexadecimal characters", result.stderr)
+                self.assertEqual(snapshot(destination), before)
+                self.assertEqual(list(empty.iterdir()), [])
+
+        # Bind the empty string inside PowerShell, independently of -File's CLI parsing.
+        script = str(REPO_ROOT / "install.ps1").replace("'", "''")
+        target = str(destination).replace("'", "''")
+        result = self.run_wrapper(
+            "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+            f"$Pin = ''; & '{script}' -Destination '{target}' -Check -Expect $Pin; exit $LASTEXITCODE",
+        )
+        self.assert_check_result(result, 2)
+        self.assertIn("--expect must contain exactly 64 hexadecimal characters", result.stderr)
+        self.assertEqual(snapshot(destination), before)
+
+    @unittest.skipUnless(SH_EXE, "POSIX shell unavailable")
+    def test_sh_modes(self) -> None:
+        command = [SH_EXE, "./install.sh"]
+        expected = run_installer(REPO_ROOT, "--fingerprint", env=self.env)
+        self.assertEqual(expected.returncode, 0, expected.stderr)
+        fingerprint = self.run_wrapper(*command, "--fingerprint")
+        self.assertEqual(fingerprint.returncode, 0, fingerprint.stderr)
+        self.assertEqual(fingerprint.stdout, expected.stdout)
+        self.assertEqual(fingerprint.stderr, "")
+        pin = expected.stdout.strip()
+
+        destination = self.root / "sh destination"
+        preview = self.run_wrapper(*command, "--destination", destination.as_posix(), "--dry-run")
+        self.assertEqual(preview.returncode, 0, preview.stderr)
+        self.assertFalse(destination.exists())
+        installed = self.run_wrapper(*command, "--destination", destination.as_posix())
+        self.assertEqual(installed.returncode, 0, installed.stderr)
+        self.assertTrue((destination / "opencode.json").is_file())
+        before = snapshot(destination)
+        empty = self.root / "empty"
+        empty.mkdir()
+
+        cases = (
+            ("pinned match", destination, ["--check", "--expect", pin], 0),
+            ("wrong pin", destination, ["--check", "--expect", "0" * 64], 1),
+            ("omitted pin", destination, ["--check"], 0),
+            ("empty destination", empty, ["--check"], 1),
+            ("pin without check", destination, ["--expect", pin], 2),
+            ("empty pin", destination, ["--check", "--expect", ""], 2),
+            ("whitespace pin", destination, ["--check", "--expect", "   "], 2),
+            ("check with dry-run", destination, ["--check", "--dry-run"], 2),
+            ("fingerprint with destination", destination, ["--fingerprint"], 2),
+        )
+        for name, target, args, code in cases:
+            with self.subTest(case=name):
+                result = self.run_wrapper(*command, "--destination", target.as_posix(), *args)
+                self.assert_check_result(result, code)
+                if name in ("empty pin", "whitespace pin"):
+                    self.assertIn("--expect must contain exactly 64 hexadecimal characters", result.stderr)
+                self.assertEqual(snapshot(destination), before)
+                self.assertEqual(list(empty.iterdir()), [])
 
 
 if __name__ == "__main__":
