@@ -26,6 +26,24 @@ The scope-focused refinements address Patrick's reported experience of Anthropic
 - **High-volume work stays on OpenAI.** OpenAI usage draws on prepaid credits; Anthropic and Google are billed per call. Execution, `general` workers, `explore` and `title` run on OpenAI models, and Anthropic and Google handle the low-volume authoring and review stages.
 - **An omitted path is never guessed.** Discover only top-level Markdown documents in the applicable new and legacy directories, excluding archives, nested documents, `README.md`, `index.md` and other indexes. Spec commands inspect both `docs/specs/` and `docs/superpowers/specs/`; plan reviews inspect both `docs/plans/` and `docs/superpowers/plans/`; code review inspects all four. Proceed only when exactly one eligible candidate exists across those directories; otherwise list candidates and require an explicit path. The in-session planner retains its ability to use a spec explicitly selected in the conversation. Explicit missing paths fail without substitution.
 
+## Reviewer perspectives and efficiency
+
+The reviewer refinements agreed on 2026-11-12 are implemented in the command source files. Each perspective guides judgment while remaining calibrated to the project's actual goals, scale and resources.
+
+| Command | Perspective and responsibility |
+|---|---|
+| [`xm-spec-review`](../../global/commands/xm-spec-review.md) | A pragmatic CTO accountable for business value, technical direction and operational efficiency. The existing scope-and-value review is otherwise unchanged. |
+| [`xm-plan-review`](../../global/commands/xm-plan-review.md) | A hands-on principal engineer accountable for technical correctness, sound data modelling, efficient execution and reliable operation. Apply financial-data and evaluation-driven improvement expertise where relevant. The guiding question is: **Will this deliver the expected behavior accurately, efficiently, and reliably?** Expected behavior is grounded in the approved spec, intended workload and available resources. |
+| [`xm-plan-simplify`](../../global/commands/xm-plan-simplify.md) | A pragmatic operations leader of a world-class hedge fund, accountable for useful outcomes with limited resources and minimal ongoing maintenance. Challenge code, dependencies, infrastructure and processes whose value does not justify their complexity, while preserving expected behavior and necessary safeguards. |
+
+**Efficiency means simple and fast.** The technical plan reviewer checks for avoidable work, repeated data access or computation, and data structures unsuited to the expected workload. Prefer the simplest approach that performs well at that scale. For a material concern, compare with a credible simpler or faster alternative and explain the tradeoff; there is no fixed number of alternatives. If performance uncertainty could change the design, recommend a focused check during implementation. Keep estimates distinct from measured evidence and avoid extra complexity for negligible gains.
+
+Overlap between technical review and simplification is acceptable. Both may identify unnecessary complexity; the simplifier remains focused on reducing implementation and maintenance burden. Changing an approved requirement is a user decision, not an automatic simplification.
+
+When a proposed simplification depends on uncertain domain knowledge, the simplifier consults authoritative sources to resolve that specific question. Unfamiliar complexity is not automatically unnecessary. This research remains within the existing bounded, read-only review with no delegation.
+
+**Verification and rollout for these refinements:** source diffs were inspected and `git diff --check` passed. The existing models, permissions, input discovery, hash checks and handoffs were preserved. Live model behavior checks and global/container installation were not performed for these revisions; they remain pending. Earlier dated verification below applies to the earlier prompts and does not establish the behavior of these refinements.
+
 ## Shared spec and plan convention
 
 The detailed convention lives in [`naming-files`](../../.opencode/skills/naming-files/SKILL.md) and applies to ordinary, XM and Superpowers work. Keep maintained specs at `docs/specs/<topic>-design.md`. Create plans at `docs/plans/YYYY-MM-DD-<topic>.md` using their creation date, with a spec link and clear status; revise an already selected active plan instead of making competing copies. Return exact saved paths and ready-to-use optional XM review commands.
@@ -124,7 +142,7 @@ The Surface rollout used the standard preview and installer, with backups under 
 
 ## Limits and open items
 
-- **Remaining preference reviews:** `xm-plan-review`, `xm-plan-simplify` and `xm-code-review`. This conversation refined the spec review and plan writer; the other three retain their initial prompts.
+- **Remaining preference review:** `xm-code-review` retains its initial prompt. The spec review, plan writer and both plan reviews have been refined; see [reviewer perspectives and efficiency](#reviewer-perspectives-and-efficiency) for the latest source changes and pending verification/rollout.
 - **Guardrails, not a sandbox.** No rule denies Code Mode (`execute`) or MCP tools for `xm-planner` or `xm-reviewer`, and the allowed Git patterns also match forms that write, such as `git diff --no-ext-diff --no-textconv --output=<file>` and `git symbolic-ref <name> <ref>`. Reviewer prompts require read-only inspection; plan and code reviews also explicitly forbid Git output writes and external helpers. The spec review directs the agent to file and documentation tools. Tightening the permission rules was not part of this work; decide on it before using the commands on a repository you do not trust.
 - **Not verified:** how the TUI behaves when the two background plan reviews report back at different times (the check used one parent session per command, through the API); a follow-up turn after `/xm-plan-write` (only the session's stored model was read); full command execution on Linux/Halo beyond the spec review installation and registration checks above; whether a `.env` read prompt inside a background reviewer reaches the user.
 - **Model picks are dated.** They reflect the models and prices available on 2026-11-11. Revisit them when a provider ships a new model or the billing arrangement changes.

@@ -7,8 +7,18 @@ model: google/gemini-4-carbon#high
 
 Review this implementation plan: $ARGUMENTS
 
-You are a fresh, independent technical reviewer. Use the supplied path, treating
-a quoted path with spaces as one path. Explicit paths may include archived plans.
+You are a fresh, independent technical reviewer. Review with the judgment of a
+hands-on principal engineer accountable for technical correctness, sound data
+modelling, efficient execution, and reliable operation. Apply expertise in
+financial data systems and evaluation-driven improvement where relevant to the
+project.
+
+Judge whether the plan will deliver the expected behavior accurately,
+efficiently, and reliably, calibrated to the approved spec, intended workload,
+and available resources.
+
+Use the supplied path, treating a quoted path with spaces as one path. Explicit
+paths may include archived plans.
 If omitted, inspect top-level Markdown plans in both `docs/plans/` and legacy
 `docs/superpowers/plans/`; do not recurse, and exclude archives and indexes such
 as `README.md` and `index.md`. Select and name a file only if exactly one eligible
@@ -41,6 +51,14 @@ Check:
    or out-of-order events, amendments, partial settlement, and deterministic replay.
 5. Where relevant: actor boundaries, observable evidence versus hidden truth,
    evaluation leakage and whether the improvement loop measures genuine progress.
+6. Efficiency (simple and fast): Check for avoidable work, repeated data access
+   or computation, and data structures unsuited to the expected workload. Prefer
+   the simplest approach that performs well at that scale. Where a material
+   concern exists, compare with a credible simpler or faster alternative and
+   explain the tradeoff. If performance uncertainty could change the design,
+   recommend a focused check during implementation. Distinguish estimates from
+   measured evidence; do not require a fixed number of alternatives or add
+   complexity for negligible gains.
 
 Identify the plan and spec paths and their content hashes, plus the Git commit
 when available. Return concrete findings in severity order with task/line,
