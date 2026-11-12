@@ -8,6 +8,7 @@ Lean, cross-platform OpenCode V2 base defaults for Windows PCs, Linux hosts (`am
 |---|---|
 | `global/opencode.json` | Native OpenCode V2 model defaults and cross-model agent profiles, `superpowers` plugin, `context7` MCP, and optional `~/.config/opencode/AGENTS.local.md` |
 | `global/commands/*.md` | Five opt-in `/xm-*` cross-model planning and review commands installed into global `commands/` |
+| `shared_harness.py` + `/shared-harness-*` | Receive-only public updates and neutral per-workspace difference reports |
 | `global/AGENTS.md` | Short, OS-neutral global working and communication rules |
 | `.opencode/skills/writer/` | Concise, practical voice for emails and workplace/personal correspondence; use `@writer` explicitly for other prose |
 | `.opencode/skills/frontend-design/` | Visual UI design craft + `references/ui-preferences.md` for greenfield interfaces |
@@ -20,13 +21,13 @@ Lean, cross-platform OpenCode V2 base defaults for Windows PCs, Linux hosts (`am
 
 Domain-specific MCP servers, plugins, and skills stay out of this base harness so unrelated workspaces pay zero extra context tokens.
 
-## Install or Update
+## Install Once per Workspace
 
-Requires the exact OpenCode V2 version in [`baseline.json`](baseline.json) and Python 3.10+ (or `uv`). Git is needed only to clone the repository.
+Requires Git, Python 3.10+ (or `uv`), and the OpenCode CLI version in [`baseline.json`](baseline.json). This repository is public; downloading defaults needs no GitHub account or token. Provider sign-ins remain separate in each workspace.
 
 ```sh
-git clone https://github.com/patrickreidy6/opencode-defaults.git
-cd opencode-defaults
+git clone https://github.com/patrickreidy6/opencode-defaults.git "$HOME/.local/share/opencode-defaults"
+cd "$HOME/.local/share/opencode-defaults"
 ```
 
 **Windows (PowerShell):**
@@ -52,7 +53,43 @@ sh ./install.sh
 ```
 (`opencode upgrade` resolves symlinks via `realPath`, so `~/.local/bin/opencode -> ~/.opencode/bin/opencode` preserves automatic `curl` updates while working in non-login SSH shells.)
 
-A workspace without repository access receives an extracted archive of the selected commit from `ops-infra`. Installing, checking and fingerprinting that source need no `.git` metadata, credentials or network access; downloading the runtime is a separate step.
+Keep this checkout as the workspace's clean upstream cache. Author improvements in your normal `opencode-defaults` development checkout and push them to `main`; each workspace chooses when to receive them. The installer adds the global slash commands, so they are available from any project in that workspace.
+
+## Periodic Drift and Update
+
+Run each command as its own OpenCode submission:
+
+```text
+/shared-harness-drift
+```
+
+This fetches public `main` into the source cache and reports:
+- **Upstream:** shared files/settings added, changed or removed since the last installation receipt.
+- **Workspace:** shared files/settings edited or removed locally since that receipt.
+- **Local:** workspace-only global additions, reported at the first unowned boundary.
+- **Project:** applicable project instruction/configuration files and `.opencode` extensions. This is an inventory, not a comparison of effective settings.
+- **Runtime:** installed CLI version and the published default's pin.
+
+Differences are normal. The report changes no installed or project files; only its dedicated Git source cache is refreshed. It exits successfully when inspection completes, even if differences exist. It shows paths/statuses rather than private values or file contents.
+
+When ready, run:
+
+```text
+/shared-harness-update
+```
+
+**Behavior 2:** receive and apply public `main` in this workspace. Back up and replace edited shared files/settings, and remove previously managed retired items even if edited. Preserve workspace-only additions, provider credentials, `AGENTS.local.md`, and project files. Shared MCP definitions are replaced as complete definitions; shared root-array entries are tracked by value, with additional local entries preserved. No changes are sent upstream, proposed for review, or applied to another workspace.
+
+The command fast-forwards only a clean `main` cache and runs its newly fetched updater. Dirty/diverged source checkouts or invalid receipts stop with an error. Existing receipt validation and backups still apply. The updater verifies the installation, applies the CLI pin with `opencode upgrade <version>` if necessary, and reloads configuration. If the CLI binary changed, it asks you to run `opencode service restart` from a terminal so it does not terminate the OpenCode session performing the update.
+
+Both slash commands use a small fixed Python driver and one shell call on GPT-6.1 Sol low. They accept no arguments. They create `~/.local/share/opencode-defaults` on first use if an older installation was made elsewhere. The equivalent terminal commands, from any active project, are:
+
+```sh
+python3 "$HOME/.local/share/opencode-defaults/shared_harness.py" drift --project .
+python3 "$HOME/.local/share/opencode-defaults/shared_harness.py" update
+```
+
+Use `uv run --no-project python` on Windows, or wherever preferred. `--destination <path>` selects an isolated configuration directory for diagnostics/tests. Updating also upgrades/reloads the CLI for the current user; that option does not isolate the runtime. `--check` below remains an offline strict baseline verifier, while `/shared-harness-drift` is the normal informational workflow.
 
 ### Installer Behavior
 - Resolves destination to `--destination`, else `$XDG_CONFIG_HOME/opencode` (when absolute), else `~/.config/opencode`.
@@ -72,8 +109,8 @@ To upgrade Superpowers deliberately:
 
 1. Select and review an upstream revision, recording its full Git commit hash.
 2. Update the `#commit` in `global/opencode.json`, the `PINNED_SUPERPOWERS` fixture in `tests/test_install.py`, and the version note above.
-3. Run the [installer tests](#validation), then preview and apply the platform-specific installer using the commands under [Install or Update](#install-or-update).
-4. Run `opencode plugin list` and confirm Superpowers loads from the selected revision. Commit the tested defaults and record their fingerprint as described below. Deliver that source to other machines, rerun the installer, then run `--check --expect <fingerprint>` (`-Check -Expect <fingerprint>` in PowerShell).
+3. Run the [installer tests](#validation), then preview and apply the platform-specific installer using the commands under [Install Once per Workspace](#install-once-per-workspace).
+4. Run `opencode plugin list` and confirm Superpowers loads from the selected revision. Commit and push the tested defaults. In each workspace, run `/shared-harness-drift`, then `/shared-harness-update` when ready.
 
 OpenCode's `opencode plugin update` skips full-commit pins. Moving the pin in this repository is what selects the next Superpowers revision; see [OpenCode's plugin documentation](https://opencode.ai/v2/docs/plugins).
 
@@ -95,13 +132,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File ./install.ps1 -Check
 powershell -NoProfile -ExecutionPolicy Bypass -File ./install.ps1 -Check -Expect <fingerprint>
 ```
 
-Replace `<fingerprint>` with the full 64-character value recorded for the selected baseline. `--fingerprint` prints the source identity without inspecting an installation. `--check` compares the destination's receipt, managed files, managed configuration and CLI version with the source beside the installer. `--check --expect` also requires that source to match the selected fingerprint; use the same expected value in both workspaces. Select an isolated or non-default destination with `--destination <path>` / `-Destination <path>` for install or check.
+These lower-level commands are useful for offline installation verification and tests. Replace `<fingerprint>` with the full 64-character value of a selected baseline. `--check --expect` pins that specific source version; workspaces need not select the same version. Select a non-default destination with `--destination <path>` / `-Destination <path>` for install or check.
 
 Exit codes: **0** for a match (or successful install/fingerprint), **1** for any finding, install failure or operation that could not complete, and **2** for usage errors. `--expect` requires `--check`; check, fingerprint and dry-run modes cannot be combined. Fingerprinting does not accept a destination.
 
-`Local` lines name additions at the first unowned boundary: configuration key paths, extra-entry counts in root `plugins` / `instructions` / `skills` lists, local files under `agents/`, `commands/`, `skills/` and `plugins/`, and `AGENTS.local.md`. Nonempty unowned directories are named once without inspecting their trees; values and file contents are never printed. The Surface should show its workstation items; `sim-funds` and `sim-prime-broker` should show `Local none`. Local presence alone does not fail the check. Configuration comparison preserves JSON types and list order: a local list entry placed where reinstall would move it is drift.
+`Local` lines name additions at the first unowned boundary: configuration key paths, extra-entry counts in root `plugins` / `instructions` / `skills` lists, local files under `agents/`, `commands/`, `skills/` and `plugins/`, and `AGENTS.local.md`. Nonempty unowned directories are named once without inspecting their trees. Each workspace can have its own additions; their presence alone never fails the check. The strict verifier preserves JSON types and list order; the slash-command drift report presents such differences neutrally.
 
-To change the baseline, edit the source, test it, commit it, then run `--fingerprint` from that clean selected commit. Record the commit, fingerprint and CLI version together in `ops-infra`, which delivers the source and runs `--check --expect` in each workspace. After any OpenCode upgrade, update `baseline.json` to the tested CLI version and follow this process; until then, upgraded machines report a runtime mismatch. For an existing runtime, `opencode upgrade <version>` selects the exact version from `baseline.json`.
+To improve the defaults, edit and test this repo, then commit and push to `main`. Workspaces receive those improvements only when you invoke `/shared-harness-update` there. Choose a tested CLI version in `baseline.json`; updates apply that pin. There is no central rollout service, shared GitHub credential, or private-repository archive-delivery step.
 
 The check covers only the installed global baseline and CLI version, **not** the running server version, project or system overrides, environment substitutions, plugin loading, MCP connectivity, provider access or model behavior. It detects accidental drift and is **not tamper-proof**: the source and installer are writable by the workspace user.
 

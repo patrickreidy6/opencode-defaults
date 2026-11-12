@@ -8,7 +8,7 @@ This repository maintains personal global OpenCode V2 defaults across Windows wo
 - `global/commands/*.md`: opt-in cross-model commands installed under global `commands/`; usage in README.md; design and live check in `docs/cross-model-workflow-design.md`.
 - `global/AGENTS.md`: OS-neutral global rules installed as `AGENTS.md`. Machine-specific instructions belong in `~/.config/opencode/AGENTS.local.md` (loaded via `instructions` when present). This root file holds repository maintenance guidance.
 - `.opencode/skills/`: shared personal Agent Skills (`writer`, `frontend-design` + `references/ui-preferences.md`, `data-preferences`, `project-setup` + `references/preferred-devtools.md`, `skill-authoring`, `naming-files`, `naming-directories`, `socratic-tutor`), installed under global `skills/`.
-- `install.py` (`install.ps1` / `install.sh`): stdlib installer with backup, XDG resolution, V1 cleanup and array-union merging; tested by `tests/test_install.py` and `tests/test_baseline.py`.
+- `install.py` (`install.ps1` / `install.sh`): stdlib bootstrap, receipts, backups and offline verification; tested under `tests/`. `shared_harness.py` powers receive-only `/shared-harness-drift` and `/shared-harness-update` using a clean public-main cache at `~/.local/share/opencode-defaults`.
 
 ## Maintenance
 - Load the built-in `opencode` skill and consult <https://opencode.ai/v2/docs/config> before changing OpenCode configuration.

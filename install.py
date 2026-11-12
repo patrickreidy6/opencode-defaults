@@ -151,7 +151,7 @@ def json_equal(value: Any, other: Any) -> bool:
 
 
 def retire_settings(
-    current: dict[str, Any], previous: dict[str, Any], incoming: dict[str, Any]
+    current: dict[str, Any], previous: dict[str, Any], incoming: dict[str, Any], *, reset_shared: bool = False
 ) -> tuple[dict[str, Any], list[str], list[str]]:
     """Remove unchanged settings dropped by the baseline, retaining local edits."""
     result = copy.deepcopy(current)
@@ -186,7 +186,7 @@ def retire_settings(
                 if was_nonempty and not value:
                     del now[key]
             elif dropped:
-                if json_equal(value, old_value):
+                if reset_shared or json_equal(value, old_value):
                     del now[key]
                     removed.append(display)
                 else:
@@ -339,7 +339,9 @@ def read_receipt(destination: Path) -> Receipt | None:
     return Receipt(data["fingerprint"], data["files"], data["config"])
 
 
-def plan_file_retirement(destination: Path, receipt: Receipt, managed: set[str]) -> tuple[list[str], list[str]]:
+def plan_file_retirement(
+    destination: Path, receipt: Receipt, managed: set[str], *, reset_shared: bool = False
+) -> tuple[list[str], list[str]]:
     removed: list[str] = []
     kept: list[str] = []
     for rel in sorted(receipt.files.keys() - managed):
@@ -353,7 +355,7 @@ def plan_file_retirement(destination: Path, receipt: Receipt, managed: set[str])
             unchanged = sha256_file(target) == receipt.files[rel]
         except (OSError, ValueError, UnicodeError):
             raise InstallError(f"{target}: unable to inspect or read retired file safely") from None
-        (removed if unchanged else kept).append(rel)
+        (removed if reset_shared or unchanged else kept).append(rel)
     return removed, kept
 
 
@@ -638,7 +640,7 @@ def prune_retired_pr4_assets(destination: Path, backup_root: Path, *, dry_run: b
             parent.rmdir()
 
 
-def run_install(repo_root: Path, destination: Path, *, dry_run: bool) -> int:
+def run_install(repo_root: Path, destination: Path, *, dry_run: bool, reset_shared: bool = False) -> int:
     active_path = repo_root / BASELINE_FILE
     try:
         load_baseline(repo_root)
@@ -673,7 +675,7 @@ def run_install(repo_root: Path, destination: Path, *, dry_run: bool) -> int:
         retired_files: list[str] = []
         kept_files: list[str] = []
         if previous is not None:
-            retired_files, kept_files = plan_file_retirement(destination, previous, set(files))
+            retired_files, kept_files = plan_file_retirement(destination, previous, set(files), reset_shared=reset_shared)
             for rel in retired_files:
                 active_path = destination / rel
                 path_state(destination, (backup_root.relative_to(destination) / rel).as_posix())
@@ -706,7 +708,9 @@ def run_install(repo_root: Path, destination: Path, *, dry_run: bool) -> int:
         retired_settings: list[str] = []
         kept_settings: list[str] = []
         if previous is not None:
-            current_cfg, retired_settings, kept_settings = retire_settings(current_cfg, previous.config, incoming_cfg)
+            current_cfg, retired_settings, kept_settings = retire_settings(
+                current_cfg, previous.config, incoming_cfg, reset_shared=reset_shared
+            )
         merged_cfg = merge_settings(current_cfg, incoming_cfg)
         # Atomic replacement (or legacy cleanup) can discard a retirement survivor.
         # Only announce settings that also survive the final merge unchanged.
