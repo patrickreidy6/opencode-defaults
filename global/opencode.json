@@ -3,7 +3,44 @@
   "model": "openai/gpt-6-astra",
   "agents": {
     "title": {
-      "model": "openai/gpt-5.6-sol"
+      "model": "openai/gpt-6.1-sol#medium"
+    },
+    "explore": {
+      "model": "openai/gpt-6-astra#medium"
+    },
+    "general": {
+      "model": "openai/gpt-6-astra#high"
+    },
+    "xm-planner": {
+      "description": "Write repository implementation plans for the opt-in /xm-plan-write command",
+      "mode": "primary",
+      "model": "anthropic/claude-opus-5-5#xhigh",
+      "permissions": [
+        { "action": "edit", "resource": "*", "effect": "deny" },
+        { "action": "edit", "resource": "docs/superpowers/plans/*.md", "effect": "allow" },
+        { "action": "shell", "resource": "*", "effect": "deny" },
+        { "action": "subagent", "resource": "*", "effect": "deny" },
+        { "action": "experimental_image_generate", "resource": "*", "effect": "deny" }
+      ]
+    },
+    "xm-reviewer": {
+      "description": "Return independent findings for the opt-in /xm-* review commands",
+      "mode": "subagent",
+      "permissions": [
+        { "action": "edit", "resource": "*", "effect": "deny" },
+        { "action": "subagent", "resource": "*", "effect": "deny" },
+        { "action": "question", "resource": "*", "effect": "deny" },
+        { "action": "experimental_image_generate", "resource": "*", "effect": "deny" },
+        { "action": "shell", "resource": "*", "effect": "deny" },
+        { "action": "shell", "resource": "git status *", "effect": "allow" },
+        { "action": "shell", "resource": "git diff --no-ext-diff --no-textconv *", "effect": "allow" },
+        { "action": "shell", "resource": "git log --oneline *", "effect": "allow" },
+        { "action": "shell", "resource": "git show --no-ext-diff --no-textconv *", "effect": "allow" },
+        { "action": "shell", "resource": "git rev-parse *", "effect": "allow" },
+        { "action": "shell", "resource": "git hash-object -- *", "effect": "allow" },
+        { "action": "shell", "resource": "git merge-base *", "effect": "allow" },
+        { "action": "shell", "resource": "git symbolic-ref *", "effect": "allow" }
+      ]
     }
   },
   "plugins": [

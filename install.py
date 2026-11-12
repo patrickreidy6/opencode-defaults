@@ -104,6 +104,10 @@ def collect_files(repo_root: Path) -> list[tuple[Path, Path]]:
     files: list[tuple[Path, Path]] = [
         (repo_root / "global" / "AGENTS.md", Path("AGENTS.md")),
     ]
+    commands_root = repo_root / "global" / "commands"
+    for path in sorted(commands_root.glob("*.md")):
+        if path.is_file():
+            files.append((path, Path("commands") / path.name))
     skills_root = repo_root / ".opencode" / "skills"
     if skills_root.is_dir():
         for path in sorted(skills_root.rglob("*")):

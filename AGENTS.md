@@ -3,11 +3,11 @@
 This repository maintains personal global OpenCode V2 defaults across Windows workstations, Linux hosts, and Docker workspace containers. It is not an application runtime dependency.
 
 ## Source Layout
-- `global/opencode.json`: portable OpenCode V2 defaults merged into `~/.config/opencode/opencode.json` (or `$XDG_CONFIG_HOME/opencode/opencode.json`).
+- `global/opencode.json`: portable V2 defaults; Astra default/general/explore, Sol title, and `/xm-*` agent permissions. Merged into `~/.config/opencode/opencode.json` (or `$XDG_CONFIG_HOME/opencode/opencode.json`).
+- `global/commands/*.md`: opt-in cross-model commands installed under global `commands/`; model assignments and usage are in README.md; design constraints and the live check for changes are in `docs/cross-model-workflow-design.md`.
 - `global/AGENTS.md`: concise, OS-neutral global rules installed as `AGENTS.md`. Machine-specific instructions belong in `~/.config/opencode/AGENTS.local.md` (loaded via `instructions` when present). This root file holds `opencode-defaults`-specific maintenance guidance instead.
 - `.opencode/skills/`: shared personal Agent Skills (`writer`, `frontend-design` + `references/ui-preferences.md`, `data-preferences`, `project-setup` + `references/preferred-devtools.md`, `skill-authoring`, `naming-files`, `naming-directories`, `socratic-tutor`), installed under global `skills/`.
-- `install.py` (`install.ps1` / `install.sh`): cross-platform Python 3 standard-library installer with backup, `$XDG_CONFIG_HOME` resolution, V1 cleanup, and array-union merging.
-- `tests/test_install.py`: automated stdlib `unittest` suite for installer behavior.
+- `install.py` (`install.ps1` / `install.sh`): stdlib installer with backup, XDG resolution, V1 cleanup and array-union merging; tested by `tests/test_install.py`.
 
 ## Maintenance
 - Load the built-in `opencode` skill and consult <https://opencode.ai/v2/docs/config> before changing OpenCode configuration.

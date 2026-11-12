@@ -16,13 +16,15 @@ PINNED_SUPERPOWERS = SUPERPOWERS_PACKAGE + "#22f0b463e7a5e579904dd6211a520321035
 
 
 class InstallHarnessTests(unittest.TestCase):
-    def run_installer(self, *args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+    def run_installer(
+        self, *args: str, env: dict[str, str] | None = None, repo_root: Path = REPO_ROOT
+    ) -> subprocess.CompletedProcess[str]:
         merged_env = os.environ.copy()
         if env:
             merged_env.update(env)
         return subprocess.run(
-            [sys.executable, str(INSTALL_PY), *args],
-            cwd=REPO_ROOT,
+            [sys.executable, str(repo_root / "install.py"), *args],
+            cwd=repo_root,
             env=merged_env,
             text=True,
             capture_output=True,
@@ -84,7 +86,9 @@ class InstallHarnessTests(unittest.TestCase):
             merged = json.loads((dest / "opencode.json").read_text(encoding="utf-8"))
             self.assertEqual(merged["$schema"], "https://opencode.ai/config.json")
             self.assertEqual(merged["model"], "openai/gpt-6-astra")
-            self.assertEqual(merged["agents"]["title"]["model"], "openai/gpt-5.6-sol")
+            self.assertEqual(merged["agents"]["title"]["model"], "openai/gpt-6.1-sol#medium")
+            self.assertEqual(merged["agents"]["explore"]["model"], "openai/gpt-6-astra#medium")
+            self.assertEqual(merged["agents"]["general"]["model"], "openai/gpt-6-astra#high")
             self.assertNotIn("small_model", merged)
             self.assertEqual(merged["experimental"], {"todo": True})
 
@@ -171,6 +175,57 @@ class InstallHarnessTests(unittest.TestCase):
                 (dest / "skills" / "project-setup" / "references" / "preferred-devtools.md").read_bytes(),
                 (REPO_ROOT / ".opencode" / "skills" / "project-setup" / "references" / "preferred-devtools.md").read_bytes(),
             )
+
+    def test_commands_install_back_up_and_preserve_local_files(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp) / "source"
+            commands = repo / "global" / "commands"
+            commands.mkdir(parents=True)
+            shutil.copy2(INSTALL_PY, repo / "install.py")
+            (repo / "global" / "opencode.json").write_text("{}\n", encoding="utf-8")
+            (repo / "global" / "AGENTS.md").write_text("# Test defaults\n", encoding="utf-8")
+            payloads = {
+                "xm-review.md": b"---\ndescription: Review\n---\nReview $ARGUMENTS.\n",
+                "xm-plan.md": b"---\ndescription: Plan\n---\nPlan $ARGUMENTS.\n",
+            }
+            for name, content in payloads.items():
+                (commands / name).write_bytes(content)
+            (commands / "notes.txt").write_text("not a command", encoding="utf-8")
+            (commands / "directory.md").mkdir()
+
+            dest = Path(tmp) / "destination"
+            (dest / "commands").mkdir(parents=True)
+            old_command = b"Previous managed command\n"
+            local_command = b"Unrelated local command\n"
+            (dest / "commands" / "xm-review.md").write_bytes(old_command)
+            (dest / "commands" / "add-notes.md").write_bytes(local_command)
+
+            preview = self.run_installer("--destination", str(dest), "--dry-run", repo_root=repo)
+            self.assertEqual(preview.returncode, 0, preview.stderr)
+            self.assertIn(str(dest / "commands" / "xm-plan.md"), preview.stdout)
+            self.assertFalse((dest / "opencode.json").exists())
+            self.assertFalse((dest / "backups").exists())
+            self.assertEqual((dest / "commands" / "xm-review.md").read_bytes(), old_command)
+            self.assertFalse((dest / "commands" / "xm-plan.md").exists())
+
+            installed = self.run_installer("--destination", str(dest), repo_root=repo)
+            self.assertEqual(installed.returncode, 0, installed.stderr)
+            self.assertEqual(
+                {p.name for p in (dest / "commands").iterdir()},
+                {"xm-review.md", "xm-plan.md", "add-notes.md"},
+            )
+            for name, content in payloads.items():
+                self.assertEqual((dest / "commands" / name).read_bytes(), content)
+            self.assertEqual((dest / "commands" / "add-notes.md").read_bytes(), local_command)
+            backups = list((dest / "backups").glob("harness-*/commands/xm-review.md"))
+            self.assertEqual(len(backups), 1)
+            self.assertEqual(backups[0].read_bytes(), old_command)
+
+            repeated = self.run_installer("--destination", str(dest), repo_root=repo)
+            self.assertEqual(repeated.returncode, 0, repeated.stderr)
+            for name, content in payloads.items():
+                self.assertEqual((dest / "commands" / name).read_bytes(), content)
+            self.assertEqual((dest / "commands" / "add-notes.md").read_bytes(), local_command)
 
     def test_superpowers_pin_converges_on_fresh_installs_and_migrations(self) -> None:
         old_pin = SUPERPOWERS_PACKAGE + "#" + "1" * 40
