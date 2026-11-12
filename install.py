@@ -139,6 +139,17 @@ def merge_settings(
     return result
 
 
+def json_equal(value: Any, other: Any) -> bool:
+    """Compare parsed JSON structurally, preserving types and array order."""
+    if type(value) is not type(other):
+        return False
+    if isinstance(value, dict):
+        return value.keys() == other.keys() and all(json_equal(value[key], other[key]) for key in value)
+    if isinstance(value, list):
+        return len(value) == len(other) and all(json_equal(item, other_item) for item, other_item in zip(value, other))
+    return value == other
+
+
 def retire_settings(
     current: dict[str, Any], previous: dict[str, Any], incoming: dict[str, Any]
 ) -> tuple[dict[str, Any], list[str], list[str]]:
@@ -146,16 +157,6 @@ def retire_settings(
     result = copy.deepcopy(current)
     removed: list[str] = []
     kept: list[str] = []
-
-    def unchanged(value: Any, old_value: Any) -> bool:
-        # Python equality equates booleans and numbers, including inside containers.
-        if type(value) is not type(old_value):
-            return False
-        if isinstance(value, dict):
-            return value.keys() == old_value.keys() and all(unchanged(value[key], old_value[key]) for key in value)
-        if isinstance(value, list):
-            return len(value) == len(old_value) and all(unchanged(item, old_item) for item, old_item in zip(value, old_value))
-        return value == old_value
 
     def walk(now: dict[str, Any], old: dict[str, Any], new: dict[str, Any], path: tuple[str, ...]) -> None:
         for key, old_value in old.items():
@@ -185,7 +186,7 @@ def retire_settings(
                 if was_nonempty and not value:
                     del now[key]
             elif dropped:
-                if unchanged(value, old_value):
+                if json_equal(value, old_value):
                     del now[key]
                     removed.append(display)
                 else:
@@ -239,6 +240,15 @@ class Receipt:
     fingerprint: str
     files: dict[str, str]
     config: dict[str, Any]
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Receipt):
+            return NotImplemented
+        return (
+            self.fingerprint == other.fingerprint
+            and self.files == other.files
+            and json_equal(self.config, other.config)
+        )
 
 
 class ReceiptError(Exception):
@@ -407,7 +417,7 @@ def config_drift_paths(installed: dict[str, Any], expected: dict[str, Any]) -> l
             child = (*path, key)
             if key not in current or key not in wanted:
                 differences.append(".".join(child))
-            elif current[key] != wanted[key]:
+            elif not json_equal(current[key], wanted[key]):
                 if path != ("mcp", "servers") and isinstance(current[key], dict) and isinstance(wanted[key], dict):
                     walk(current[key], wanted[key], child)
                 else:
@@ -750,7 +760,7 @@ def run_install(repo_root: Path, destination: Path, *, dry_run: bool) -> int:
         failures = verify_installed(destination, receipt.files)
         try:
             state = path_state(destination, "opencode.json")
-            if state is None or not stat.S_ISREG(state.st_mode) or read_config(config_path) != merged_cfg:
+            if state is None or not stat.S_ISREG(state.st_mode) or not json_equal(read_config(config_path), merged_cfg):
                 failures.append("opencode.json")
         except (OSError, ValueError, UnicodeError, InstallError):
             failures.append("opencode.json")

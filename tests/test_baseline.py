@@ -490,6 +490,24 @@ class ReceiptTests(unittest.TestCase):
         backups = list((self.destination / "backups").glob("harness-*/opencode-defaults-receipt.json"))
         self.assertEqual([path.read_bytes() for path in backups], [previous])
 
+    def test_same_fingerprint_with_type_changed_metadata_stops_install(self) -> None:
+        config = json.loads(DEFAULT_SOURCE["global/opencode.json"])
+        config["mcp"]["servers"]["context7"]["options"] = [{"enabled": True}]
+        (self.source / "global/opencode.json").write_text(json.dumps(config), encoding="utf-8")
+        self.assertEqual(self.run_install()[0], 0)
+        receipt = json.loads(self.receipt_path.read_bytes())
+        original_fingerprint, original_files = receipt["fingerprint"], receipt["files"].copy()
+        receipt["config"]["mcp"]["servers"]["context7"]["options"][0]["enabled"] = 1
+        self.receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+        self.assertEqual((receipt["fingerprint"], receipt["files"]), (original_fingerprint, original_files))
+        before = snapshot(self.destination)
+        for dry_run in (True, False):
+            with self.subTest(dry_run=dry_run):
+                code, _, stderr = self.run_install(dry_run=dry_run)
+                self.assertEqual(code, 1, stderr)
+                self.assertIn("inconsistent history for the same fingerprint", stderr)
+                self.assertEqual(snapshot(self.destination), before)
+
     def test_failed_verification_keeps_old_receipt(self) -> None:
         self.assertEqual(self.run_install()[0], 0)
         previous = self.receipt_path.read_bytes()
@@ -519,6 +537,29 @@ class ReceiptTests(unittest.TestCase):
         self.assertIn("opencode.json", stderr)
         self.assertNotIn("local-plugin", stderr)
         self.assertEqual(self.receipt_path.read_bytes(), previous)
+
+    def test_written_config_type_change_fails_verification_before_receipt(self) -> None:
+        config = json.loads(DEFAULT_SOURCE["global/opencode.json"])
+        config["mcp"]["servers"]["context7"]["options"] = [{"enabled": True}]
+        (self.source / "global/opencode.json").write_text(json.dumps(config), encoding="utf-8")
+        self.assertEqual(self.run_install()[0], 0)
+        previous = self.receipt_path.read_bytes()
+        original = Path.write_text
+
+        def change_type(path, text, *args, **kwargs):
+            if path == self.destination / "opencode.json":
+                cfg = json.loads(text)
+                cfg["mcp"]["servers"]["context7"]["options"][0]["enabled"] = 1
+                text = json.dumps(cfg)
+            return original(path, text, *args, **kwargs)
+
+        with mock.patch.object(Path, "write_text", change_type):
+            code, _, stderr = self.run_install()
+        self.assertEqual(code, 1)
+        self.assertIn("installed verification failed", stderr)
+        self.assertIn("opencode.json", stderr)
+        self.assertEqual(self.receipt_path.read_bytes(), previous)
+        self.assertEqual(list((self.destination / "backups").glob("harness-*/opencode-defaults-receipt.json")), [])
 
     def test_failed_receipt_replace_keeps_previous(self) -> None:
         self.assertEqual(self.run_install()[0], 0)
@@ -1194,6 +1235,64 @@ class CheckTests(InstalledFixture):
         self.assertNotIn("SECRET_EDIT", output)
         (self.destination / "commands/xm-demo.md").mkdir()
         self.assertIn("Files invalid commands/xm-demo.md", self.check(expected=1))
+
+    def test_receipt_only_nested_boolean_to_number_differs(self) -> None:
+        cfg = self.read_config()
+        cfg["mcp"]["servers"]["context7"]["options"] = [{"enabled": True}]
+        (self.source / "global/opencode.json").write_text(json.dumps(cfg), encoding="utf-8")
+        self.install_source()
+        path = self.destination / install.RECEIPT_NAME
+        receipt = json.loads(path.read_bytes())
+        original_fingerprint, original_files = receipt["fingerprint"], receipt["files"].copy()
+        receipt["config"]["mcp"]["servers"]["context7"]["options"][0]["enabled"] = 1
+        path.write_text(json.dumps(receipt), encoding="utf-8")
+        self.assertEqual((receipt["fingerprint"], receipt["files"]), (original_fingerprint, original_files))
+        before = snapshot(self.destination)
+        output = self.check(expected=1)
+        self.assertEqual(section(output, "Receipt"), ["Receipt differs"])
+        self.assertEqual(section(output, "Files"), ["Files ok"])
+        self.assertEqual(section(output, "Config"), ["Config ok"])
+        self.assertEqual(section(output, "Result"), ["Result DRIFT, 1 findings"])
+        self.assertEqual(snapshot(self.destination), before)
+
+    def test_managed_nested_boolean_to_number_is_config_drift(self) -> None:
+        cfg = self.read_config()
+        cfg["mcp"]["servers"]["context7"]["options"] = [{"enabled": True}]
+        cfg["agents"]["title"]["options"] = {"enabled": True}
+        (self.source / "global/opencode.json").write_text(json.dumps(cfg), encoding="utf-8")
+        self.install_source()
+        changed = copy.deepcopy(cfg)
+        changed["mcp"]["servers"]["context7"]["options"][0]["enabled"] = 1
+        changed["agents"]["title"]["options"]["enabled"] = 1
+        self.write_config(changed)
+        output = self.check(expected=1)
+        self.assertEqual(section(output, "Receipt"), ["Receipt ok"])
+        self.assertEqual(section(output, "Files"), ["Files ok"])
+        self.assertEqual(section(output, "Config"), [
+            "Config differs agents.title.options.enabled", "Config differs mcp.servers.context7",
+        ])
+        self.assertEqual(section(output, "Result"), ["Result DRIFT, 2 findings"])
+        self.install_source()
+        self.check()
+        restored = self.read_config()
+        self.assertIs(restored["mcp"]["servers"]["context7"]["options"][0]["enabled"], True)
+        self.assertIs(restored["agents"]["title"]["options"]["enabled"], True)
+
+    def test_union_membership_remains_equality_based_with_type_sensitive_check(self) -> None:
+        cfg = self.read_config()
+        cfg["plugins"] = [{"package": "managed-plugin", "options": {"enabled": True}}]
+        (self.source / "global/opencode.json").write_text(json.dumps(cfg), encoding="utf-8")
+        self.install_source()
+        changed = copy.deepcopy(cfg)
+        changed["plugins"][0]["options"]["enabled"] = 1
+        self.write_config(changed)
+        output = self.check(expected=1)
+        self.assertEqual(section(output, "Config"), ["Config differs plugins"])
+        self.assertEqual(section(output, "Local"), ["Local none"])
+        self.install_source()
+        self.assertEqual(len(self.read_config()["plugins"]), 1)
+        self.assertIs(self.read_config()["plugins"][0]["options"]["enabled"], True)
+        self.check()
 
     def test_file_read_error_is_unreadable(self) -> None:
         original = Path.read_bytes
