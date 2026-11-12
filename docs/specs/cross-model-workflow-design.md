@@ -44,6 +44,26 @@ When a proposed simplification depends on uncertain domain knowledge, the simpli
 
 **Verification and rollout for these refinements:** source diffs were inspected and `git diff --check` passed. The existing models, permissions, input discovery, hash checks and handoffs were preserved. Live model behavior checks and global/container installation were not performed for these revisions; they remain pending. Earlier dated verification below applies to the earlier prompts and does not establish the behavior of these refinements.
 
+## Code review verification and scope
+
+The code-review refinements agreed on 2026-11-12 preserve the existing Fable 5.2 `high` reviewer, requirement discovery, read-only role and implementer handoff. The command's scope, verification and reporting rules override the corresponding Superpowers template rules; upstream skills remain unchanged.
+
+- **Judge the final state.** Inspect committed, staged, unstaged and relevant untracked changes, then assess the combined working tree against the resolved base SHA. Do not report a committed defect that later local work already fixes.
+- **Verify each finding.** After discovery, challenge each candidate against actual callers, guards, tests, documented intent, the base revision and the final state. Require a reachable trigger and concrete consequence. Drop speculative, handled, superseded, duplicate and unchanged pre-existing defects unless this change worsens them or makes them newly reachable.
+- **Protect approved scope.** Respect exclusions and deferrals. A real correctness or security failure may matter even if the spec omitted its trigger; a new feature, style preference or unrelated refactor is not automatically a requirement. Do not inherit the template's exhaustive list of declined ideas or its invitation to polish.
+- **Bind findings to inspected contents.** Record raw content hashes before reading requirements, instructions and code used as evidence, then recheck those hashes, missing paths, HEAD and changed/untracked path lists before reporting. The code reviewer uses `git hash-object --no-filters -- <path>` and its matching inspection permission, so clean filters neither execute nor hide byte changes. Report drift or an unavailable required check as `BLOCKED`. This detects observed drift; it is not an atomic snapshot or protection against transient changes between reads.
+- **Separate review from execution evidence.** Report supplied test/static-analysis results with their source and covered revision/content; distinguish reported results from inspected evidence. Missing or stale results need an exact follow-up check. They are not, by themselves, proof of a code defect.
+
+Verdicts have explicit meanings. `BLOCKED` takes precedence when essential scope/context is missing, a material unresolved question prevents reliable assessment, or snapshot checks fail/change. `NEEDS CHANGES` means stable, assessable scope with a substantiated Critical or Important defect. `READY` means no material findings within completed static-review scope; minor defects or execution-evidence gaps may remain. It is neither a passing test result nor permission to merge or deploy. Material fixes require a review of the updated state.
+
+This follows the separation of finding discovery, verification and deduplication described in [Claude Code Review](https://code.claude.com/docs/en/code-review), and the evidence and severity calibration in its [customization guidance](https://code.claude.com/docs/en/code-review-customize). A single read-only reviewer remains the default. Model changes and additional reviewers should be justified by observed results rather than assumed to improve quality.
+
+### Evaluation and rollout
+
+The reusable [code-review fixtures](../../tests/fixtures/code-review/README.md) cover clean changes, approved intentional behavior, an edge case handled by a caller, an unchanged pre-existing bug, a committed bug fixed locally, and an actual cross-file regression. The builder checks each case's behavior and keeps expected findings outside the model-visible repositories. Compare old and proposed commands on the same cases and model, recording false positives, missed expected findings, cost, elapsed time and coverage/permission failures. Do not count fixture behavior checks or installer tests as evidence that an LLM review found the right issues.
+
+Verification and local rollout results for this revision will be recorded here after the focused checks complete.
+
 ## Shared spec and plan convention
 
 The detailed convention lives in [`naming-files`](../../.opencode/skills/naming-files/SKILL.md) and applies to ordinary, XM and Superpowers work. Keep maintained specs at `docs/specs/<topic>-design.md`. Create plans at `docs/plans/YYYY-MM-DD-<topic>.md` using their creation date, with a spec link and clear status; revise an already selected active plan instead of making competing copies. Return exact saved paths and ready-to-use optional XM review commands.
@@ -142,7 +162,7 @@ The Surface rollout used the standard preview and installer, with backups under 
 
 ## Limits and open items
 
-- **Remaining preference review:** `xm-code-review` retains its initial prompt. The spec review, plan writer and both plan reviews have been refined; see [reviewer perspectives and efficiency](#reviewer-perspectives-and-efficiency) for the latest source changes and pending verification/rollout.
+- **Review refinements:** code-review scope and verification are described [above](#code-review-verification-and-scope). The separate spec/plan reviewer refinements still have their own verification and rollout status under [reviewer perspectives and efficiency](#reviewer-perspectives-and-efficiency).
 - **Guardrails, not a sandbox.** No rule denies Code Mode (`execute`) or MCP tools for `xm-planner` or `xm-reviewer`, and the allowed Git patterns also match forms that write, such as `git diff --no-ext-diff --no-textconv --output=<file>` and `git symbolic-ref <name> <ref>`. Reviewer prompts require read-only inspection; plan and code reviews also explicitly forbid Git output writes and external helpers. The spec review directs the agent to file and documentation tools. Tightening the permission rules was not part of this work; decide on it before using the commands on a repository you do not trust.
 - **Not verified:** how the TUI behaves when the two background plan reviews report back at different times (the check used one parent session per command, through the API); a follow-up turn after `/xm-plan-write` (only the session's stored model was read); full command execution on Linux/Halo beyond the spec review installation and registration checks above; whether a `.env` read prompt inside a background reviewer reaches the user.
 - **Model picks are dated.** They reflect the models and prices available on 2026-11-11. Revisit them when a provider ships a new model or the billing arrangement changes.

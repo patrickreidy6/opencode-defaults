@@ -41,6 +41,7 @@
         { "action": "shell", "resource": "git show --no-ext-diff --no-textconv *", "effect": "allow" },
         { "action": "shell", "resource": "git rev-parse *", "effect": "allow" },
         { "action": "shell", "resource": "git hash-object -- *", "effect": "allow" },
+        { "action": "shell", "resource": "git hash-object --no-filters -- *", "effect": "allow" },
         { "action": "shell", "resource": "git merge-base *", "effect": "allow" },
         { "action": "shell", "resource": "git symbolic-ref *", "effect": "allow" }
       ]
