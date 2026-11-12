@@ -14,6 +14,8 @@ Maintained specs live in `specs/`, active plans in `plans/`, and completed plans
 
 Completion archives the plan, not its maintained spec. Archived plans retain historical requirements, commands and evidence; they are not instructions to rerun completed work. Follow-up work gets a new active plan linked to its spec. Reviews may use an explicit archived path.
 
+[Deferred cross-model work](specs/cross-model-workflow-design.md#deferred-work) tracks the separate boundary review and optional workflow-assistance/runner assessment.
+
 ## Document migration 2026-11-12
 
 | Original path | Current path |

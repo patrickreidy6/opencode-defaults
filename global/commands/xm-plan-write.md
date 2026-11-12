@@ -52,6 +52,11 @@ Write for a capable Astra executor starting in a fresh session:
 - Plan checks for required behavior and consequential failure cases, using the
   project's existing tools. State expected results and runnable commands; these
   are planned checks, not evidence that tests have passed.
+  For generated or simulated data, prefer a small, human-traceable example that
+  checks the scenario's intended relationships and event order as well as types
+  and formats. Reuse an existing example when it suffices, and preserve deliberately
+  introduced discrepancies. Keep these checks within the approved scenario;
+  do not expand fields or model coverage merely to make it more realistic.
 - Include code only where it resolves material ambiguity. Do not require full test
   implementations, a fixed number of review-focus cases, or a repeated
   test/implementation/commit sequence for every small step. Keep detail and testing

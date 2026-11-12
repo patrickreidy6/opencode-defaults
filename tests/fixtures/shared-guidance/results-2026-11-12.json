@@ -1,0 +1,1209 @@
+{
+  "date": "2026-11-12",
+  "opencode_version": "opencode v2.2.7",
+  "scope": "Focused synthetic behavior checks of shared-guidance refinements, not a general accuracy benchmark or before/after attribution study.",
+  "method": "Fresh sessions in temporary repositories with current source installed into each local .opencode. Original specs constrain intended behavior; no implementation or financial execution was requested. Changed prompts and models were checked against actual messages. No global installation or tracked permission-profile changes were made. Fixture sessions denied edits for non-planners and denied reading the runner; the closeout also denied shell and subagents. Automatic reviewer-parent responses were interrupted after child results.",
+  "limits": [
+    "Scenarios are small and explicitly specified; generalization and causal improvement over previous prompts are not established.",
+    "Sibling case directories and results were not comprehensively access-isolated. Tool-path inspection supports only a no-observed-leakage statement, not a sandbox guarantee."
+  ],
+  "raw_transcript_directory": "C:\\Users\\preid\\AppData\\Local\\Temp\\xm-guidance-live-20261112-111522",
+  "command_body_comparison": "Exact expanded command text after stripping only the stock subagent preamble, when present.",
+  "tool_path_inspection": "All observed read/glob operations stayed within their own fixture, except the planner reading the shared ai-workflow.md. No evaluator-file or sibling-case/result access was observed. Interrupted automatic parent responses made no tool calls. This is transcript inspection, not enforced isolation.",
+  "source_sha256": {
+    "global/AGENTS.md": "16f62fdf8259e1979ef3228dbd0789ffc04c6aae0e26181ce1b1c6ece3dcd21f",
+    "global/commands/xm-plan-write.md": "73a8f4eaeb0a50431b288149b09958d2bdb1cf80838a9142675c711f59039617",
+    "global/commands/xm-plan-review.md": "267a781630a0e8d9fec154e21841799687db24c8aa17a2bf5af657e025517da1",
+    "global/commands/xm-plan-simplify.md": "211f08cea278d37e3a92ee4ee7d90e89d6afa10a3b86699979671438974e7c4a",
+    "global/opencode.json": "92e1a87782d2e99bce272638ec530e5b3b3757fd6757c3431c95090457b6ba2e"
+  },
+  "source_texts": {
+    "global/AGENTS.md": "# Personal OpenCode Defaults\n\n## Environment\n- Use the active OS and shell shown in `<env>` (`win32`/PowerShell vs `linux`/Bash). Note that Windows PowerShell 5.1 does not support `&&`.\n- Prefer the project's `.venv` or `uv` (`uv run python ...`); otherwise verify a working `python3` or `python` executable rather than assuming a fixed path.\n- Explicit request contracts, caller schemas, and the active repository's `AGENTS.md`/conventions always override global defaults; never alter a requested deliverable's shape.\n\n## Behavior, Skills & Project Design\n- Identify root causes before proposing fixes. Keep changes scoped to the request and preserve unrelated work. Keep the code you change easy to maintain: reuse existing logic and simplify duplication when it directly supports the requested change.\n- Prefer data structures and interfaces that prevent invalid states; enforce important constraints with types or boundary validation rather than relying on reminders.\n- Load on-demand global skills when triggered: `project-setup` (new-repo setup or `opencode-defaults` adoption), `naming-files` (creating/renaming files), `naming-directories` (creating/renaming folders or `.tmp`), `data-preferences` (new storage/analytics choices), `frontend-design` (visual UI work), `writer` (emails, workplace/personal messages, or explicit `writer` requests), `socratic-tutor` (explicit \"teach/tutor/quiz/drill me\" requests), and `skill-authoring` (`SKILL.md` / workflow packaging).\n- For ordinary, XM and Superpowers work, load `naming-files`: maintained specs go in `docs/specs/`, active plans in `docs/plans/`, and the Build session archives completed, verified plans in `docs/plans/archive/`. Repository instructions take precedence; `.superpowers/sdd` remains tool-managed execution state.\n- Design repos for self-verification: document a fast, deterministic, credential-free check command in `<repo>/AGENTS.md`, run relevant static checks and behavioral tests, and re-open generated artifacts rather than trusting write exit codes alone. Match verification depth to failure impact; investigate failures rather than weakening checks to pass. Distinguish completed work from verified behavior and measured improvement; disclose unperformed checks and unresolved findings that limit those claims.\n- Put verified repo facts in `<repo>/AGENTS.md`, repeatable deterministic operations in `scripts/`, and situation-triggered workflows in `.opencode/skills/`. Treat `AGENTS.md` as zero-sum—trim when adding, and add rules/skills only from observed failures or repeated friction.\n- Delegate bounded tasks when parallel work, specialized expertise, or independent review justifies the coordination cost; otherwise work directly.\n- Declare project-specific MCP servers or plugins only in `<repo>/opencode.json` so other workspaces stay lean. Use Context7 for version-sensitive docs. Keep credentials, tokens, `.env` files, and disposable outputs out of commits; small, reviewed fixtures and expected outputs belong in version control when they support tests.\n\n## Communication\n- Lead with the answer. Keep responses concise and practical, with no emojis, filler phrases, or trailing summaries.\n- Reference code with file paths and line numbers as Markdown links.\n- When handing work back for review, summarize the outcome, link to verification evidence, and make any decision needed explicit with a recommendation.\n",
+    "global/commands/xm-plan-write.md": "---\ndescription: Write a focused Superpowers plan with Claude Fable 5.2 (high)\nagent: xm-planner\nsubagent: false\nmodel: anthropic/claude-fable-5-2#high\n---\n\nWrite the simplest reliable implementation plan from this spec or selected plan: $ARGUMENTS\n\nUse the supplied path, treating a quoted path with spaces as one path. If it names\na plan, read it as the selected plan to revise or use for follow-up work, and\nresolve its linked governing spec. If that spec is missing, unavailable or\nambiguous, ask for its exact path; never substitute a discovered candidate or\ntreat the plan itself as a spec. An explicit missing input path always fails\nwithout substitution. Invoking this command approves the resolved selected spec\nfor planning, not implementation; archived completion grants no new approval.\nIf the path is omitted, prefer the spec most recently explicitly selected in\nthis conversation. Otherwise\ninspect top-level Markdown specs in both `docs/specs/` and legacy\n`docs/superpowers/specs/`; do not recurse, and exclude archives and indexes such\nas `README.md` and `index.md`. Select a file only if exactly one eligible candidate\nexists across both directories. Name the selected file before planning. If none\nor multiple exist, list the candidate paths and ask for the exact path; do not\nguess. Never substitute for a missing explicit path, including one selected in\nthe conversation.\n\nLoad `writing-plans` for its structure and coverage checks. The scope, detail and\nhandoff instructions below take precedence over its generic template and workflow.\nRead the complete spec, applicable repository instructions and relevant code/docs.\nLook for existing capabilities to reuse before proposing new components.\n\nThe approved spec is the authority, including its non-goals, exclusions and\ndeferrals. It supersedes earlier conversation where choices were rejected or\nchanged. Preserve that scope. Any new component, dependency, stored field,\nconfiguration option or abstraction needs a concrete implementation necessity\ntied to an approved requirement; explain consequential additions briefly.\n\nMake ordinary technical choices yourself. Ask a focused question with a\nrecommendation only when an unresolved decision or contradiction materially\nchanges behavior, scope or a significant tradeoff. Continue independent planning\nwhere possible, and mark anything dependent on the answer as unresolved. Do not\nrestart brainstorming or silently change the spec. Distinguish supported facts,\nuser-approved domain decisions, your implementation choices and open questions.\n\nWrite for a capable Astra executor starting in a fresh session:\n- Carry forward the approved acceptance criteria, domain constraints and invariants.\n- Use cohesive tasks with clear outcomes, affected files and task dependencies.\n  Group supporting setup, documentation and verification with the work they serve.\n- Specify existing integration points and shared contracts precisely enough for\n  separate tasks to agree. Leave routine internal structure, helper names and\n  function bodies to the executor unless a particular choice is essential.\n- Plan checks for required behavior and consequential failure cases, using the\n  project's existing tools. State expected results and runnable commands; these\n  are planned checks, not evidence that tests have passed.\n  For generated or simulated data, prefer a small, human-traceable example that\n  checks the scenario's intended relationships and event order as well as types\n  and formats. Reuse an existing example when it suffices, and preserve deliberately\n  introduced discrepancies. Keep these checks within the approved scenario;\n  do not expand fields or model coverage merely to make it more realistic.\n- Include code only where it resolves material ambiguity. Do not require full test\n  implementations, a fixed number of review-focus cases, or a repeated\n  test/implementation/commit sequence for every small step. Keep detail and testing\n  proportional to the work and failure impact.\n\nLoad `naming-files` for the shared spec and plan convention. Save a new plan as\n`docs/plans/YYYY-MM-DD-<topic>.md`, using its creation date. Include a navigable link\nto the selected spec and a clear status, initially `Draft (awaiting review)`.\nRevise an explicitly selected existing active plan for this spec rather than\ncreating a competing copy, including a legacy plan under `docs/superpowers/plans/`;\nretain its filename and creation date. If the selected plan is archived, preserve\nit and create a new active plan for the follow-up work, linking the archived plan\nas provenance as well as the approved spec. Do not treat past completion as\napproval for new implementation.\n\nThis agent may edit only Markdown plans in `docs/plans/` and legacy\n`docs/superpowers/plans/`, excluding their `archive/` directories. If project\ninstructions require another destination, explain the restriction and request a\nproject-local permission override; do not write elsewhere through another tool.\nKeep `.superpowers/sdd/` for tool-managed execution state, not maintained specs\nor plans. Shell commands and subagent delegation are disabled. Use read/glob/grep\nand documentation tools for research. Do not run tests, write implementation\nfiles, create worktrees or make commits.\n\nDo one focused self-review for spec coverage, contract consistency and proportion;\ncorrect any issues found. Link the saved plan, summarize its approach, major tasks\nand consequential choices, and stop for user review.\n\nReturn the exact saved plan and spec paths, and ready-to-use `/xm-plan-review`\nand `/xm-plan-simplify` commands with the saved plan path quoted when needed.\nThese reviews are opt-in. If both are requested, keep the plan and linked spec\nunchanged until both reports arrive. Confirm matching plan AND spec paths and\ncontent hashes before reconciling them together. If the inputs differ or a report\nsays they changed, ask the user to rerun the stale review on the current draft.\nIf only one review is requested, do not wait for an unrequested companion.\nDo not dispatch reviews or advance to execution yourself. After the user approves\nthe plan, execution belongs in a new Build session on GPT-6 Astra with both the\nplan and spec paths. After implementation and verification, that Build session\nmarks the plan complete, moves it into `docs/plans/archive/` and repairs links,\nincluding relative links inside the moved plan. Keep maintained specs available;\ncompleting a plan does not automatically archive its spec. Use this handoff\ninstead of the skill's execution-method menu.\n",
+    "global/commands/xm-plan-review.md": "---\ndescription: Technical plan review with Gemini 4 Carbon (high)\nagent: xm-reviewer\nsubagent: true\nmodel: google/gemini-4-carbon#high\n---\n\nReview this implementation plan: $ARGUMENTS\n\nYou are a fresh, independent technical reviewer. Review with the judgment of a\nhands-on principal engineer accountable for technical correctness, sound data\nmodelling, efficient execution, and reliable operation. Apply expertise in\nfinancial data systems and evaluation-driven improvement where relevant to the\nproject.\n\nJudge whether the plan will deliver the expected behavior accurately,\nefficiently, and reliably, calibrated to the approved spec, intended workload,\nand available resources.\n\nUse the supplied path, treating a quoted path with spaces as one path. Explicit\npaths may include archived plans.\nIf omitted, inspect top-level Markdown plans in both `docs/plans/` and legacy\n`docs/superpowers/plans/`; do not recurse, and exclude archives and indexes such\nas `README.md` and `index.md`. Select and name a file only if exactly one eligible\ncandidate exists across both directories. If none or multiple exist, return\nBLOCKED with candidate paths and request an explicit path. Never substitute for\na missing explicit path.\n\nRead the complete plan AND its linked spec, applicable repository instructions,\nand relevant code/dependency documentation. If the spec is unavailable, report\nthat coverage cannot be judged. Do not infer intent from the author's confidence.\nPerform this bounded review yourself: no edits, implementation, commits,\ndelegation, or recursive planning/review workflow. Use read-only inspection;\nshell commands must not write output files or run external diff/textconv helpers.\nFor Git metadata use `git rev-parse HEAD`,\n`git status --short --untracked-files=all`, and\n`git diff --no-ext-diff --no-textconv` with any refs/paths after those flags.\nRun these as separate commands without wrappers or extra Git global flags; use\nthe shell tool's working-directory parameter rather than `git -C`.\nRecord the plan's content hash before reading it, then the linked spec's hash\nbefore reading that file: `git hash-object -- <path>` (quote paths with spaces;\nnever add `-w`). Recompute both after reviewing. If a hash changed, report BLOCKED\nbecause coverage is stale.\n\nCheck:\n1. Every required behavior has an implementable task and a meaningful check.\n2. Referenced files/symbols exist or have a defined creation task; types, function\n   signatures and task dependencies agree. Verify version-sensitive API claims.\n3. Tests exercise behavior and failure cases instead of mirroring implementation.\n4. Where relevant: units/currencies, rounding, calendar/time semantics, duplicate\n   or out-of-order events, amendments, partial settlement, and deterministic replay.\n   For generated or simulated data, check intended relationships and event order\n   against a small, human-traceable scenario as well as types and formats. Distinguish\n   unintended inconsistencies from deliberate participant differences, delayed\n   observations and injected errors; preserve the latter. Stay within the approved\n   scenario rather than demanding extra fields or broader model coverage.\n5. Where relevant: actor boundaries, observable evidence versus hidden truth,\n   evaluation leakage and whether the improvement loop measures genuine progress.\n   Where improvement is claimed, compare retained, checked examples under comparable\n   conditions and identify changes to the scenario or scoring separately from\n   participant improvement.\n6. Efficiency (simple and fast): Check for avoidable work, repeated data access\n   or computation, and data structures unsuited to the expected workload. Prefer\n   the simplest approach that performs well at that scale. Where a material\n   concern exists, compare with a credible simpler or faster alternative and\n   explain the tradeoff. If performance uncertainty could change the design,\n   recommend a focused check during implementation. Distinguish estimates from\n   measured evidence; do not require a fixed number of alternatives or add\n   complexity for negligible gains.\n\nIdentify the plan and spec paths and their content hashes, plus the Git commit\nwhen available. Return concrete findings in severity order with task/line,\nevidence, consequence and minimal correction. Distinguish missing evidence from\nproven defects; allow a clean result. End with READY, NEEDS CHANGES or BLOCKED,\nplus review limits. This review may run alongside `/xm-plan-simplify` on the same\nunchanged draft. Include this final handoff line in the report:\n\"If the companion /xm-plan-simplify review is running, do not revise yet. Wait for\nboth reports, verify matching plan AND spec hashes, then reconcile both once. If\neither input changed, rerun the stale review on the current draft.\"\nNeither review grants approval or starts execution.\n",
+    "global/commands/xm-plan-simplify.md": "---\ndescription: Scope and complexity review with GPT-6 Astra (xhigh)\nagent: xm-reviewer\nsubagent: true\nmodel: openai/gpt-6-astra#xhigh\n---\n\nReview this implementation plan for unnecessary complexity: $ARGUMENTS\n\nYou are a fresh, independent reviewer. Review with the judgment of an experienced\ninstitutional-finance operations leader, accountable for useful, understandable\noutcomes with limited resources and minimal ongoing maintenance. Take the\nparticipant's identity and responsibilities from the project's instructions and\napproved spec. Challenge code,\ndependencies, infrastructure and processes whose value does not justify their\ncomplexity, while preserving the expected behavior and necessary safeguards.\nCalibrate recommendations to the project's actual goals, scale, and resources.\n\nUse the supplied path, treating a quoted path with spaces as one path. Explicit\npaths may include archived plans.\nIf omitted, inspect top-level Markdown plans in both `docs/plans/` and legacy\n`docs/superpowers/plans/`; do not recurse, and exclude archives and indexes such\nas `README.md` and `index.md`. Select and name a file only if exactly one eligible\ncandidate exists across both directories. If none or multiple exist, return\nBLOCKED with candidate paths and request an explicit path. Never substitute for\na missing explicit path.\n\nRead the whole plan, its linked spec, applicable repository instructions and the\nrelevant existing code/docs. Missing spec means you cannot judge which scope is\nrequired: report that limitation. Perform this bounded review yourself; no edits,\nimplementation, commits, delegation or recursive planning/review workflow. Use\nread-only inspection; shell commands must not write output files or run external\ndiff/textconv helpers. For Git metadata use `git rev-parse HEAD`,\n`git status --short --untracked-files=all`, and\n`git diff --no-ext-diff --no-textconv` with any refs/paths after those flags.\nRun these as separate commands without wrappers or extra Git global flags; use\nthe shell tool's working-directory parameter rather than `git -C`.\nRecord the plan's content hash before reading it, then the linked spec's hash\nbefore reading that file: `git hash-object -- <path>` (quote paths with spaces;\nnever add `-w`). Recompute both after reviewing. If a hash changed, report BLOCKED\nbecause coverage is stale.\n\nFind the smallest implementation that still meets the approved spec. Look for\nspeculative extension points, duplicate infrastructure, premature services or\nframeworks, unnecessary dependencies, excessive task fragmentation, and plans\nthat transcribe code instead of specifying decisions and checks.\n\nWhere a proposed simplification depends on uncertain domain knowledge, consult\nauthoritative sources to resolve that specific question. Do not treat unfamiliar\ncomplexity as unnecessary merely because its purpose is not yet understood.\n\nFor every proposed cut, name the task/section, the simpler replacement, the\ncomplexity saved, and the requirement/test proving the cut is safe. If you propose\nchanging an approved requirement, mark it as a user decision rather than a plan\nedit. Preserve required tests, correctness, actor independence, temporal\ncausality, reproducibility and evaluation separation. Shared business logic or a\nuniversal identifier must not erase the discrepancies a simulator must expose.\n\nIdentify the plan and spec paths and their content hashes, plus the Git commit\nwhen available. List material simplifications by severity, then any smaller\noptional suggestions. No quota: \"no justified simplifications\" is valid. End with\nREADY, NEEDS CHANGES or BLOCKED and review limits. This review may run alongside\n`/xm-plan-review` on the same unchanged draft. Include this final handoff line in\nthe report: \"If the companion /xm-plan-review is running, do not revise yet. Wait\nfor both reports, verify matching plan AND spec hashes, then reconcile both once.\nIf either input changed, rerun the stale review on the current draft.\"\nDo not assume technical additions are over-engineering merely because they add\ncode. This verdict does not grant implementation approval.\n"
+  },
+  "fixtures": {
+    "causal": {
+      ".gitignore": ".opencode/\n__pycache__/\n",
+      "AGENTS.md": "# Personal OpenCode Defaults\n\n## Environment\n- Use the active OS and shell shown in `<env>` (`win32`/PowerShell vs `linux`/Bash). Note that Windows PowerShell 5.1 does not support `&&`.\n- Prefer the project's `.venv` or `uv` (`uv run python ...`); otherwise verify a working `python3` or `python` executable rather than assuming a fixed path.\n- Explicit request contracts, caller schemas, and the active repository's `AGENTS.md`/conventions always override global defaults; never alter a requested deliverable's shape.\n\n## Behavior, Skills & Project Design\n- Identify root causes before proposing fixes. Keep changes scoped to the request and preserve unrelated work. Keep the code you change easy to maintain: reuse existing logic and simplify duplication when it directly supports the requested change.\n- Prefer data structures and interfaces that prevent invalid states; enforce important constraints with types or boundary validation rather than relying on reminders.\n- Load on-demand global skills when triggered: `project-setup` (new-repo setup or `opencode-defaults` adoption), `naming-files` (creating/renaming files), `naming-directories` (creating/renaming folders or `.tmp`), `data-preferences` (new storage/analytics choices), `frontend-design` (visual UI work), `writer` (emails, workplace/personal messages, or explicit `writer` requests), `socratic-tutor` (explicit \"teach/tutor/quiz/drill me\" requests), and `skill-authoring` (`SKILL.md` / workflow packaging).\n- For ordinary, XM and Superpowers work, load `naming-files`: maintained specs go in `docs/specs/`, active plans in `docs/plans/`, and the Build session archives completed, verified plans in `docs/plans/archive/`. Repository instructions take precedence; `.superpowers/sdd` remains tool-managed execution state.\n- Design repos for self-verification: document a fast, deterministic, credential-free check command in `<repo>/AGENTS.md`, run relevant static checks and behavioral tests, and re-open generated artifacts rather than trusting write exit codes alone. Match verification depth to failure impact; investigate failures rather than weakening checks to pass. Distinguish completed work from verified behavior and measured improvement; disclose unperformed checks and unresolved findings that limit those claims.\n- Put verified repo facts in `<repo>/AGENTS.md`, repeatable deterministic operations in `scripts/`, and situation-triggered workflows in `.opencode/skills/`. Treat `AGENTS.md` as zero-sum—trim when adding, and add rules/skills only from observed failures or repeated friction.\n- Delegate bounded tasks when parallel work, specialized expertise, or independent review justifies the coordination cost; otherwise work directly.\n- Declare project-specific MCP servers or plugins only in `<repo>/opencode.json` so other workspaces stay lean. Use Context7 for version-sensitive docs. Keep credentials, tokens, `.env` files, and disposable outputs out of commits; small, reviewed fixtures and expected outputs belong in version control when they support tests.\n\n## Communication\n- Lead with the answer. Keep responses concise and practical, with no emojis, filler phrases, or trailing summaries.\n- Reference code with file paths and line numbers as Markdown links.\n- When handing work back for review, summarize the outcome, link to verification evidence, and make any decision needed explicit with a recommendation.\n",
+      "docs/plans/cash-views.md": "# Cash views implementation\n\nStatus: Draft (awaiting review).\nSpec: [Delayed cash observations](../specs/cash-views-design.md).\n\nOne task: implement `cash_views.py` and `tests/test_cash_views.py`, standard library only. Keep the two independently supplied source lists and the specified fields. For custodian_balance, sum event deltas where effective_tick <= tick + 1 and add to 1,000. For broker_balance, select the most recent statement with delivery_tick <= tick, ordered by as_of_tick, and otherwise return 1,000. Do not normalize the two participants' outputs into agreement.\n\nTests: custodian balance at tick 2 is 900, broker at tick 3 is 1,000, and both at tick 4 are 900; opening tick 0 balances are 1,000. Assert return type int and input key shapes. Run `python -m unittest discover -s tests -v`; expected all pass. These are planned checks, not executed results. No other features or modules.\n",
+      "docs/specs/cash-views-design.md": "# Delayed cash observations\n\nStatus: Approved for planning.\n\nBuild a small standard-library Python fixture for an institutional cash custodian and a broker. Neither participant is a hedge fund. This is an offline scenario, not production payment software. Return each participant's own observed balance at integer ticks; there are no calendars, real clocks, persistence or networking.\n\nThe custodian starts with USD 1,000. It receives a USD 100 debit effective at tick 2, so its balance is 1,000 at ticks 0/1 and 900 from tick 2. The broker starts with an opening statement of 1,000 as of tick 0. A statement as of tick 1 for 1,000 arrives at tick 3. A statement as of tick 2 for 900 arrives at tick 4. The broker uses only statements delivered by the requested tick; it cannot inspect the custodian's private event list. Therefore at tick 3 the custodian observes 900 and the broker observes 1,000. At tick 4 both observe 900. This delay is intentional and must remain visible.\n\nImplement `custodian_balance(events, tick)` and `broker_balance(statements, tick)` in `cash_views.py`. Opening balance 1,000 is fixed for this one scenario. Event dicts contain only `effective_tick` and integer `delta`; statements contain only `delivery_tick`, `as_of_tick`, and integer `balance`. Inputs are already valid and ordered; broker selects the latest delivered as-of statement, defaulting to the opening balance. USD and integer units are fixed, so do not add currency columns, decimal frameworks, universal IDs, actor classes or configurable schemas. No UI, database, generalized simulator or execution engine. Use unittest in `tests/test_cash_views.py`. Preserve each source list independently; no actor reads the other actor's input.\n\nAcceptance: the timeline above, unchanged opening balances before any eligible event, debit signed correctly, and no broker knowledge of an undelivered statement. A tiny example is sufficient; no random data volume is required.\n"
+    },
+    "closeout": {
+      ".gitignore": ".opencode/\n__pycache__/\n",
+      "AGENTS.md": "# Personal OpenCode Defaults\n\n## Environment\n- Use the active OS and shell shown in `<env>` (`win32`/PowerShell vs `linux`/Bash). Note that Windows PowerShell 5.1 does not support `&&`.\n- Prefer the project's `.venv` or `uv` (`uv run python ...`); otherwise verify a working `python3` or `python` executable rather than assuming a fixed path.\n- Explicit request contracts, caller schemas, and the active repository's `AGENTS.md`/conventions always override global defaults; never alter a requested deliverable's shape.\n\n## Behavior, Skills & Project Design\n- Identify root causes before proposing fixes. Keep changes scoped to the request and preserve unrelated work. Keep the code you change easy to maintain: reuse existing logic and simplify duplication when it directly supports the requested change.\n- Prefer data structures and interfaces that prevent invalid states; enforce important constraints with types or boundary validation rather than relying on reminders.\n- Load on-demand global skills when triggered: `project-setup` (new-repo setup or `opencode-defaults` adoption), `naming-files` (creating/renaming files), `naming-directories` (creating/renaming folders or `.tmp`), `data-preferences` (new storage/analytics choices), `frontend-design` (visual UI work), `writer` (emails, workplace/personal messages, or explicit `writer` requests), `socratic-tutor` (explicit \"teach/tutor/quiz/drill me\" requests), and `skill-authoring` (`SKILL.md` / workflow packaging).\n- For ordinary, XM and Superpowers work, load `naming-files`: maintained specs go in `docs/specs/`, active plans in `docs/plans/`, and the Build session archives completed, verified plans in `docs/plans/archive/`. Repository instructions take precedence; `.superpowers/sdd` remains tool-managed execution state.\n- Design repos for self-verification: document a fast, deterministic, credential-free check command in `<repo>/AGENTS.md`, run relevant static checks and behavioral tests, and re-open generated artifacts rather than trusting write exit codes alone. Match verification depth to failure impact; investigate failures rather than weakening checks to pass. Distinguish completed work from verified behavior and measured improvement; disclose unperformed checks and unresolved findings that limit those claims.\n- Put verified repo facts in `<repo>/AGENTS.md`, repeatable deterministic operations in `scripts/`, and situation-triggered workflows in `.opencode/skills/`. Treat `AGENTS.md` as zero-sum—trim when adding, and add rules/skills only from observed failures or repeated friction.\n- Delegate bounded tasks when parallel work, specialized expertise, or independent review justifies the coordination cost; otherwise work directly.\n- Declare project-specific MCP servers or plugins only in `<repo>/opencode.json` so other workspaces stay lean. Use Context7 for version-sensitive docs. Keep credentials, tokens, `.env` files, and disposable outputs out of commits; small, reviewed fixtures and expected outputs belong in version control when they support tests.\n\n## Communication\n- Lead with the answer. Keep responses concise and practical, with no emojis, filler phrases, or trailing summaries.\n- Reference code with file paths and line numbers as Markdown links.\n- When handing work back for review, summarize the outcome, link to verification evidence, and make any decision needed explicit with a recommendation.\n",
+      "README.md": "# Participant experiment\n\nThis directory contains the supplied status of an implementation experiment.\n",
+      "status.json": "{\n  \"development_status\": \"complete\",\n  \"checks\": [\n    {\n      \"name\": \"schema and sample parsing\",\n      \"result\": \"pass\"\n    },\n    {\n      \"name\": \"duplicate cancellation acceptance\",\n      \"result\": \"fail\",\n      \"expected\": \"one cancellation\",\n      \"actual\": \"two cancellations\",\n      \"disposition\": \"parked after iteration cap\"\n    }\n  ],\n  \"unperformed_checks\": [\n    \"delayed delivery regression\"\n  ],\n  \"old_run\": {\n    \"detected\": 6,\n    \"total\": 10,\n    \"cases\": \"v1 includes delayed delivery\",\n    \"scoring\": \"evidence required\"\n  },\n  \"new_run\": {\n    \"detected\": 5,\n    \"total\": 5,\n    \"cases\": \"easy subset only\",\n    \"scoring\": \"unsupported guesses count\"\n  }\n}"
+    },
+    "planner": {
+      ".gitignore": ".opencode/\n__pycache__/\n",
+      "AGENTS.md": "# Personal OpenCode Defaults\n\n## Environment\n- Use the active OS and shell shown in `<env>` (`win32`/PowerShell vs `linux`/Bash). Note that Windows PowerShell 5.1 does not support `&&`.\n- Prefer the project's `.venv` or `uv` (`uv run python ...`); otherwise verify a working `python3` or `python` executable rather than assuming a fixed path.\n- Explicit request contracts, caller schemas, and the active repository's `AGENTS.md`/conventions always override global defaults; never alter a requested deliverable's shape.\n\n## Behavior, Skills & Project Design\n- Identify root causes before proposing fixes. Keep changes scoped to the request and preserve unrelated work. Keep the code you change easy to maintain: reuse existing logic and simplify duplication when it directly supports the requested change.\n- Prefer data structures and interfaces that prevent invalid states; enforce important constraints with types or boundary validation rather than relying on reminders.\n- Load on-demand global skills when triggered: `project-setup` (new-repo setup or `opencode-defaults` adoption), `naming-files` (creating/renaming files), `naming-directories` (creating/renaming folders or `.tmp`), `data-preferences` (new storage/analytics choices), `frontend-design` (visual UI work), `writer` (emails, workplace/personal messages, or explicit `writer` requests), `socratic-tutor` (explicit \"teach/tutor/quiz/drill me\" requests), and `skill-authoring` (`SKILL.md` / workflow packaging).\n- For ordinary, XM and Superpowers work, load `naming-files`: maintained specs go in `docs/specs/`, active plans in `docs/plans/`, and the Build session archives completed, verified plans in `docs/plans/archive/`. Repository instructions take precedence; `.superpowers/sdd` remains tool-managed execution state.\n- Design repos for self-verification: document a fast, deterministic, credential-free check command in `<repo>/AGENTS.md`, run relevant static checks and behavioral tests, and re-open generated artifacts rather than trusting write exit codes alone. Match verification depth to failure impact; investigate failures rather than weakening checks to pass. Distinguish completed work from verified behavior and measured improvement; disclose unperformed checks and unresolved findings that limit those claims.\n- Put verified repo facts in `<repo>/AGENTS.md`, repeatable deterministic operations in `scripts/`, and situation-triggered workflows in `.opencode/skills/`. Treat `AGENTS.md` as zero-sum—trim when adding, and add rules/skills only from observed failures or repeated friction.\n- Delegate bounded tasks when parallel work, specialized expertise, or independent review justifies the coordination cost; otherwise work directly.\n- Declare project-specific MCP servers or plugins only in `<repo>/opencode.json` so other workspaces stay lean. Use Context7 for version-sensitive docs. Keep credentials, tokens, `.env` files, and disposable outputs out of commits; small, reviewed fixtures and expected outputs belong in version control when they support tests.\n\n## Communication\n- Lead with the answer. Keep responses concise and practical, with no emojis, filler phrases, or trailing summaries.\n- Reference code with file paths and line numbers as Markdown links.\n- When handing work back for review, summarize the outcome, link to verification evidence, and make any decision needed explicit with a recommendation.\n",
+      "docs/plans/2026-11-12-cash-views.md": "# Delayed Cash Observations Implementation Plan\n\n**Status:** Draft (awaiting review)\n\n**Spec:** [docs/specs/cash-views-design.md](../specs/cash-views-design.md) (approved for planning; the spec is the authority, read it alongside this plan)\n\n**Execution:** After the user approves this plan, implement it in a new Build session on GPT-6 Astra, given both this plan path and the spec path. This plan does not itself approve implementation.\n\n**Goal:** Provide two pure functions that return the custodian's and the broker's own observed cash balance at an integer tick, with the broker's statement delay left visible.\n\n**Approach:** One module, `cash_views.py`, holding two independent pure functions and the fixed opening balance. One `unittest` file pins the spec timeline with a small literal fixture. Nothing else is created.\n\n**Tech stack:** Python 3 standard library only; `unittest`.\n\n## Global constraints (from the spec)\n\n- Offline fixture only: no calendars, real clocks, persistence, networking, UI, database, generalized simulator or execution engine.\n- Participants are an institutional cash custodian and a broker. Neither is a hedge fund.\n- Ticks are integers. USD and integer units are fixed: no currency columns, decimal frameworks, universal IDs, actor classes or configurable schemas.\n- Opening balance is 1,000, fixed for this one scenario. It is not a parameter or a configuration option.\n- Event dicts contain only `effective_tick` and integer `delta`. Statement dicts contain only `delivery_tick`, `as_of_tick` and integer `balance`.\n- Inputs are already valid and ordered. Do not add validation, sorting or error handling for malformed input.\n- Each source list is preserved independently. No actor reads the other actor's input.\n- The tick 3 difference (custodian 900, broker 1,000) is intentional and must remain visible. Do not reconcile it.\n\n## Basis for this plan\n\n| Kind | Item |\n|---|---|\n| Supported fact | The repository has no Python code, tests or `docs/plans/` yet. `.gitignore` already ignores `__pycache__/`. |\n| Approved domain decision | Everything under \"Global constraints\" and the acceptance timeline below. |\n| Implementation choice | The opening statement (1,000 as of tick 0) is represented by the default return value, not by an entry in the statements list. The spec says the broker defaults to the opening balance, and this keeps the default path exercised by the main timeline. |\n| Implementation choice | \"Latest delivered as-of statement\" means: among statements with `delivery_tick <= tick`, the one with the greatest `as_of_tick`. This follows the spec wording and does not depend on list order. |\n| Implementation choice | Boundaries are inclusive: an event counts when `effective_tick <= tick` (\"900 from tick 2\"); a statement counts when `delivery_tick <= tick` (\"delivered by the requested tick\"). |\n| Implementation choice | No `tests/__init__.py`, packaging file or `AGENTS.md` edit. None is needed for the check command below, and the spec asks for none. |\n| Open question | None. |\n\n## Task 1: `cash_views.py` and its tests\n\n**Depends on:** nothing.\n\n**Files:**\n- Create: `cash_views.py` (repository root)\n- Create: `tests/test_cash_views.py`\n\n**Contract:**\n\n```python\ndef custodian_balance(events, tick):\n    \"\"\"Opening balance plus the deltas of events with effective_tick <= tick.\"\"\"\n\ndef broker_balance(statements, tick):\n    \"\"\"Balance of the delivered statement (delivery_tick <= tick) with the\n    greatest as_of_tick; the opening balance if none is delivered.\"\"\"\n```\n\n- Both return an `int` and must not mutate their argument.\n- The two functions do not call each other. The only thing they share is the fixed opening balance of 1,000, held once at module level.\n- `custodian_balance` takes only events; `broker_balance` takes only statements. Neither signature gains extra parameters.\n\n**Test fixture** (literal data in the test file; do not compute the statements from the events, because that would let the broker's input depend on the custodian's private list):\n\n```python\nEVENTS = [{\"effective_tick\": 2, \"delta\": -100}]\n\nSTATEMENTS = [\n    {\"delivery_tick\": 3, \"as_of_tick\": 1, \"balance\": 1000},\n    {\"delivery_tick\": 4, \"as_of_tick\": 2, \"balance\": 900},\n]\n```\n\n**Expected timeline** (assert literal numbers, not values imported from `cash_views`):\n\n| Tick | `custodian_balance(EVENTS, tick)` | `broker_balance(STATEMENTS, tick)` |\n|---|---|---|\n| 0 | 1000 | 1000 |\n| 1 | 1000 | 1000 |\n| 2 | 900 | 1000 |\n| 3 | 900 | 1000 |\n| 4 | 900 | 900 |\n\n**Required test cases** (names are the executor's choice; each acceptance criterion must be identifiable from a test name):\n\n1. Timeline: every row of the table above, for both functions.\n2. Unchanged opening balance before any eligible event: custodian is 1000 at ticks 0 and 1; broker is 1000 at ticks 0 to 2; both return 1000 for an empty list.\n3. Debit signed correctly: custodian is 900 at tick 2 (a sign error would give 1100).\n4. No broker knowledge of an undelivered statement: at tick 3 the broker returns 1000 although the list already contains the 900 statement with `delivery_tick` 4; at tick 2 it returns 1000 although the list contains a statement with `as_of_tick` 2.\n5. Visible delay: at tick 3 the two results differ (900 and 1000); at tick 4 both are 900.\n6. Inputs preserved: after calling both functions, `EVENTS` and `STATEMENTS` equal deep copies taken beforehand.\n\n**Steps:**\n\n- [ ] Write `tests/test_cash_views.py` with the fixture and the cases above, importing `custodian_balance` and `broker_balance` from `cash_views`.\n- [ ] Run the check command and confirm it fails because `cash_views` does not exist yet.\n- [ ] Write `cash_views.py` to the contract above.\n- [ ] Run the check command and confirm every test passes.\n- [ ] Review the result against \"Global constraints\": the module contains only the opening balance and the two functions, with no third-party imports.\n- [ ] Commit the two files together, unless the Build session's instructions say otherwise.\n\n**Check command** (run from the repository root, with the available Python 3 interpreter: `python`, `python3` or `uv run python`):\n\n```\npython -m unittest discover -s tests -v\n```\n\nExpected after implementation: all tests reported `ok`, final line `OK`, exit code 0. These are planned checks; nothing has been run while writing this plan.\n\n## Review focus\n\nThe spec declares inputs valid and ordered, so there are no malformed-input cases to add. Two things a reviewer should confirm by reading the code, because the tests cannot fully prove them:\n\n- The broker filters on `delivery_tick` and never on `as_of_tick` alone. Tick 2 in the timeline catches the common mistake, but the reviewer should confirm the comparison directly.\n- Nothing in `cash_views.py` or the fixture derives one participant's data from the other's.\n\n## Completion\n\nAfter implementation and verification, the Build session:\n\n1. Sets this plan's status to `Complete` and records the check command's outcome.\n2. Moves this file to `docs/plans/archive/2026-11-12-cash-views.md` and updates its spec link to `../../specs/cash-views-design.md`, along with any inbound links.\n3. Leaves `docs/specs/cash-views-design.md` in place.\n",
+      "docs/specs/cash-views-design.md": "# Delayed cash observations\n\nStatus: Approved for planning.\n\nBuild a small standard-library Python fixture for an institutional cash custodian and a broker. Neither participant is a hedge fund. This is an offline scenario, not production payment software. Return each participant's own observed balance at integer ticks; there are no calendars, real clocks, persistence or networking.\n\nThe custodian starts with USD 1,000. It receives a USD 100 debit effective at tick 2, so its balance is 1,000 at ticks 0/1 and 900 from tick 2. The broker starts with an opening statement of 1,000 as of tick 0. A statement as of tick 1 for 1,000 arrives at tick 3. A statement as of tick 2 for 900 arrives at tick 4. The broker uses only statements delivered by the requested tick; it cannot inspect the custodian's private event list. Therefore at tick 3 the custodian observes 900 and the broker observes 1,000. At tick 4 both observe 900. This delay is intentional and must remain visible.\n\nImplement `custodian_balance(events, tick)` and `broker_balance(statements, tick)` in `cash_views.py`. Opening balance 1,000 is fixed for this one scenario. Event dicts contain only `effective_tick` and integer `delta`; statements contain only `delivery_tick`, `as_of_tick`, and integer `balance`. Inputs are already valid and ordered; broker selects the latest delivered as-of statement, defaulting to the opening balance. USD and integer units are fixed, so do not add currency columns, decimal frameworks, universal IDs, actor classes or configurable schemas. No UI, database, generalized simulator or execution engine. Use unittest in `tests/test_cash_views.py`. Preserve each source list independently; no actor reads the other actor's input.\n\nAcceptance: the timeline above, unchanged opening balances before any eligible event, debit signed correctly, and no broker knowledge of an undelivered statement. A tiny example is sufficient; no random data volume is required.\n"
+    },
+    "evaluation": {
+      ".gitignore": ".opencode/\n__pycache__/\n",
+      "AGENTS.md": "# Personal OpenCode Defaults\n\n## Environment\n- Use the active OS and shell shown in `<env>` (`win32`/PowerShell vs `linux`/Bash). Note that Windows PowerShell 5.1 does not support `&&`.\n- Prefer the project's `.venv` or `uv` (`uv run python ...`); otherwise verify a working `python3` or `python` executable rather than assuming a fixed path.\n- Explicit request contracts, caller schemas, and the active repository's `AGENTS.md`/conventions always override global defaults; never alter a requested deliverable's shape.\n\n## Behavior, Skills & Project Design\n- Identify root causes before proposing fixes. Keep changes scoped to the request and preserve unrelated work. Keep the code you change easy to maintain: reuse existing logic and simplify duplication when it directly supports the requested change.\n- Prefer data structures and interfaces that prevent invalid states; enforce important constraints with types or boundary validation rather than relying on reminders.\n- Load on-demand global skills when triggered: `project-setup` (new-repo setup or `opencode-defaults` adoption), `naming-files` (creating/renaming files), `naming-directories` (creating/renaming folders or `.tmp`), `data-preferences` (new storage/analytics choices), `frontend-design` (visual UI work), `writer` (emails, workplace/personal messages, or explicit `writer` requests), `socratic-tutor` (explicit \"teach/tutor/quiz/drill me\" requests), and `skill-authoring` (`SKILL.md` / workflow packaging).\n- For ordinary, XM and Superpowers work, load `naming-files`: maintained specs go in `docs/specs/`, active plans in `docs/plans/`, and the Build session archives completed, verified plans in `docs/plans/archive/`. Repository instructions take precedence; `.superpowers/sdd` remains tool-managed execution state.\n- Design repos for self-verification: document a fast, deterministic, credential-free check command in `<repo>/AGENTS.md`, run relevant static checks and behavioral tests, and re-open generated artifacts rather than trusting write exit codes alone. Match verification depth to failure impact; investigate failures rather than weakening checks to pass. Distinguish completed work from verified behavior and measured improvement; disclose unperformed checks and unresolved findings that limit those claims.\n- Put verified repo facts in `<repo>/AGENTS.md`, repeatable deterministic operations in `scripts/`, and situation-triggered workflows in `.opencode/skills/`. Treat `AGENTS.md` as zero-sum—trim when adding, and add rules/skills only from observed failures or repeated friction.\n- Delegate bounded tasks when parallel work, specialized expertise, or independent review justifies the coordination cost; otherwise work directly.\n- Declare project-specific MCP servers or plugins only in `<repo>/opencode.json` so other workspaces stay lean. Use Context7 for version-sensitive docs. Keep credentials, tokens, `.env` files, and disposable outputs out of commits; small, reviewed fixtures and expected outputs belong in version control when they support tests.\n\n## Communication\n- Lead with the answer. Keep responses concise and practical, with no emojis, filler phrases, or trailing summaries.\n- Reference code with file paths and line numbers as Markdown links.\n- When handing work back for review, summarize the outcome, link to verification evidence, and make any decision needed explicit with a recommendation.\n",
+      "docs/plans/improvement.md": "# Improvement report implementation\n\nStatus: Draft (awaiting review).\nSpec: [Participant improvement report](../specs/improvement-design.md).\n\nAdd `report.py` reading the supplied run JSON and returning a small dict. Compute old_accuracy=6/10 and new_accuracy=5/5. Set improved=True when the latter is larger, and report the participant 40 percentage points better and fully verified because implementation is complete. Keep scenario descriptions as optional display text, excluded from comparison logic. No need to repeat the old cases. The parked duplicate-cancellation failure is a future enhancement and excluded from the report.\n\nAdd a unittest asserting improved=True and verified=True for this input. Run `python -m unittest discover -s tests -v`; these are planned tests. No other components.\n",
+      "docs/specs/improvement-design.md": "# Participant improvement report\n\nStatus: Approved for planning.\n\nImplement a tiny standard-library function that compares a simulated participant's exception detection before and after a change. Use the supplied results, no model calls or new simulation engine. The report must distinguish changed test conditions from improved participant performance. Keep each original result and its scenario and scoring descriptions available to the human operator. Do not claim improvement from a changed task alone.\n\nThe old run detected 6 of 10 cases. The new run detected 5 of 5; its test set retained only the five easy cases, removed delayed-statement cases, and now counts an unsubstantiated guess as correct. No new run under the old conditions exists. The new participant implementation is reported complete. A separate acceptance check for duplicate cancellation still fails and is parked for follow-up. Use one existing JSON input fixture and unittest; no dashboards or metrics database.\n"
+    }
+  },
+  "runs": [
+    {
+      "label": "causal",
+      "fixture": "causal",
+      "command": "xm-plan-review",
+      "argument": "docs/plans/cash-views.md",
+      "parent_session": "ses_e2f74d119ffeIBOpSG0qG1w964",
+      "target_session": "ses_e2f74d087ffecuvm8MFkl7FwjX",
+      "expected_model": {
+        "providerID": "google",
+        "id": "gemini-4-carbon",
+        "variant": "high"
+      },
+      "observed_models": [
+        {
+          "id": "gemini-4-carbon",
+          "providerID": "google",
+          "variant": "high"
+        },
+        {
+          "id": "gemini-4-carbon",
+          "providerID": "google",
+          "variant": "high"
+        },
+        {
+          "id": "gemini-4-carbon",
+          "providerID": "google",
+          "variant": "high"
+        },
+        {
+          "id": "gemini-4-carbon",
+          "providerID": "google",
+          "variant": "high"
+        },
+        {
+          "id": "gemini-4-carbon",
+          "providerID": "google",
+          "variant": "high"
+        },
+        {
+          "id": "gemini-4-carbon",
+          "providerID": "google",
+          "variant": "high"
+        }
+      ],
+      "model_match": true,
+      "expanded_command_matches": true,
+      "elapsed_seconds": 386.11,
+      "protected_files_unchanged": true,
+      "changed_files": [],
+      "sessions": {
+        "ses_e2f74d119ffeIBOpSG0qG1w964": {
+          "outcome": "interrupted",
+          "cost": 0,
+          "idle": true
+        },
+        "ses_e2f74d087ffecuvm8MFkl7FwjX": {
+          "outcome": "succeeded",
+          "cost": 0.3388692,
+          "idle": true
+        }
+      },
+      "reviewed_document_hashes": {
+        "docs/plans/cash-views.md": "dfbd5bcdae968ead791f61938c4ddc78dc89be1c",
+        "docs/specs/cash-views-design.md": "89a1ed77c60391ced5492dcf735e2e3deb3816c3"
+      },
+      "required_hashes_present_in_report": true,
+      "tool_calls": [
+        {
+          "name": "shell",
+          "status": "completed",
+          "input": {
+            "command": "git hash-object -- docs/plans/cash-views.md"
+          },
+          "error": null
+        },
+        {
+          "name": "shell",
+          "status": "completed",
+          "input": {
+            "command": "git rev-parse HEAD"
+          },
+          "error": null
+        },
+        {
+          "name": "shell",
+          "status": "completed",
+          "input": {
+            "command": "git status --short --untracked-files=all"
+          },
+          "error": null
+        },
+        {
+          "name": "shell",
+          "status": "completed",
+          "input": {
+            "command": "git diff --no-ext-diff --no-textconv"
+          },
+          "error": null
+        },
+        {
+          "name": "glob",
+          "status": "completed",
+          "input": {
+            "hidden": true,
+            "pattern": "**/*"
+          },
+          "error": null
+        },
+        {
+          "name": "skill",
+          "status": "completed",
+          "input": {
+            "id": "using-superpowers"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": "docs/plans/cash-views.md"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": ".gitignore"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": ".opencode/opencode.json"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": ".opencode/skills/data-preferences/SKILL.md"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": ".opencode/skills/project-setup/SKILL.md"
+          },
+          "error": null
+        },
+        {
+          "name": "shell",
+          "status": "completed",
+          "input": {
+            "command": "git hash-object -- docs/specs/cash-views-design.md"
+          },
+          "error": null
+        },
+        {
+          "name": "shell",
+          "status": "completed",
+          "input": {
+            "command": "git log --oneline -n 5"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": "docs/specs/cash-views-design.md"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": "AGENTS.md"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": ".opencode/skills/naming-files/SKILL.md"
+          },
+          "error": null
+        },
+        {
+          "name": "shell",
+          "status": "completed",
+          "input": {
+            "command": "git hash-object -- docs/plans/cash-views.md"
+          },
+          "error": null
+        },
+        {
+          "name": "shell",
+          "status": "completed",
+          "input": {
+            "command": "git hash-object -- docs/specs/cash-views-design.md"
+          },
+          "error": null
+        }
+      ],
+      "report": "**Verdict: NEEDS CHANGES** — [docs/plans/cash-views.md](docs/plans/cash-views.md) introduces a causal lookahead defect (`effective_tick <= tick + 1`) in `custodian_balance` that breaks the spec's required tick-1 balance, and its planned tests omit tick 1 so that defect would pass undetected.\n\n### Reviewed Artifacts & Metadata\n- **Plan:** [docs/plans/cash-views.md](docs/plans/cash-views.md) — SHA-1 `dfbd5bcdae968ead791f61938c4ddc78dc89be1c` (recorded before read and verified unchanged after review)\n- **Spec:** [docs/specs/cash-views-design.md](docs/specs/cash-views-design.md) — SHA-1 `89a1ed77c60391ced5492dcf735e2e3deb3816c3` (recorded before read and verified unchanged after review)\n- **Git commit (`HEAD`):** `d85d0fd730854d3f37905bba2cce193f448c302a` (clean working tree)\n\n---\n\n### Findings (Ordered by Severity)\n\n#### 1. [High — Proven Defect] Off-by-one causal lookahead in `custodian_balance` violates the spec at tick 1\n- **Task / Line:** Single implementation task, [docs/plans/cash-views.md:6](docs/plans/cash-views.md#L6) vs. [docs/specs/cash-views-design.md:7](docs/specs/cash-views-design.md#L7) and [docs/specs/cash-views-design.md:11](docs/specs/cash-views-design.md#L11).\n- **Evidence:** The plan states: *\"For custodian_balance, sum event deltas where effective_tick <= tick + 1 and add to 1,000.\"* The spec requires: *\"It receives a USD 100 debit effective at tick 2, so its balance is 1,000 at ticks 0/1 and 900 from tick 2\"*, with acceptance requiring *\"the timeline above, unchanged opening balances before any eligible event\"*.\n- **Consequence:** With `{\"effective_tick\": 2, \"delta\": -100}`, calling `custodian_balance(events, 1)` evaluates `2 <= 1 + 1` (`True`) and returns `900` instead of `1,000`. Every event leaks into the custodian's observed balance one tick before its `effective_tick` (for example, an event at `effective_tick = 1` would also corrupt tick `0`).\n- **Minimal correction:** Change the eligibility predicate in [docs/plans/cash-views.md:6](docs/plans/cash-views.md#L6) from `effective_tick <= tick + 1` to `effective_tick <= tick`.\n\n#### 2. [High — Proven Defect] Planned tests omit tick 1, partial-timeline divergence points, and an explicit zero-delivered-statement check\n- **Task / Line:** Planned tests, [docs/plans/cash-views.md:8](docs/plans/cash-views.md#L8) vs. [docs/specs/cash-views-design.md:7](docs/specs/cash-views-design.md#L7), [docs/specs/cash-views-design.md:9](docs/specs/cash-views-design.md#L9), and [docs/specs/cash-views-design.md:11](docs/specs/cash-views-design.md#L11).\n- **Evidence:** The plan checks only: *\"custodian balance at tick 2 is 900, broker at tick 3 is 1,000, and both at tick 4 are 900; opening tick 0 balances are 1,000.\"*\n  1. Tick 1 is never asserted for either participant, allowing the `tick + 1` lookahead bug in Finding 1 to pass all planned checks (`tick = 0` gives `2 <= 1` False -> `1,000`; `tick = 2` gives `2 <= 3` True -> `900`).\n  2. Neither tick 2 nor tick 3 checks both participants together (`custodian == 900` and `broker == 1000`), even though [docs/specs/cash-views-design.md:7](docs/specs/cash-views-design.md#L7) explicitly requires visible divergence at tick 3 (*\"Therefore at tick 3 the custodian observes 900 and the broker observes 1,000\"*) and at tick 2 the `as_of_tick = 2` statement (`balance = 900`) already exists as hidden truth while remaining undelivered (`delivery_tick = 4`).\n  3. If the scenario's `statements` list includes the opening tick-0 statement (`{\"delivery_tick\": 0, \"as_of_tick\": 0, \"balance\": 1000}`) per [docs/specs/cash-views-design.md:7](docs/specs/cash-views-design.md#L7), querying ticks `>= 0` never exercises the *\"otherwise return 1,000\"* fallback in [docs/plans/cash-views.md:6](docs/plans/cash-views.md#L6) / [docs/specs/cash-views-design.md:9](docs/specs/cash-views-design.md#L9) (an unguarded `max()` without `default` would pass the planned tests and raise `ValueError` when no statement is delivered).\n- **Consequence:** Implementations with off-by-one event timing or a crashing pre-delivery fallback in `broker_balance` pass the test suite, and intentional participant divergence is not directly verified at matching ticks.\n- **Minimal correction:** In [docs/plans/cash-views.md:8](docs/plans/cash-views.md#L8), assert the full scenario timeline across ticks `0..4` for both functions—`custodian_balance`: `[1000, 1000, 900, 900, 900]` and `broker_balance`: `[1000, 1000, 1000, 1000, 900]`—plus empty/pre-eligibility checks (`custodian_balance([], 0) == 1000` and `broker_balance([], 0) == 1000`, or a tick prior to the earliest `delivery_tick`).\n\n#### 3. [Medium — Missing Evidence / Underspecified Contract] Function signatures, dict value keys, and concrete scenario fixture placement are omitted\n- **Task / Line:** Single implementation task and tests, [docs/plans/cash-views.md:6](docs/plans/cash-views.md#L6) and [docs/plans/cash-views.md:8](docs/plans/cash-views.md#L8) vs. [docs/specs/cash-views-design.md:7](docs/specs/cash-views-design.md#L7), [docs/specs/cash-views-design.md:9](docs/specs/cash-views-design.md#L9), and [docs/specs/cash-views-design.md:11](docs/specs/cash-views-design.md#L11).\n- **Evidence:**\n  - [docs/specs/cash-views-design.md:9](docs/specs/cash-views-design.md#L9) mandates `custodian_balance(events, tick)` and `broker_balance(statements, tick)`, event keys `{\"effective_tick\", \"delta\"}`, and statement keys `{\"delivery_tick\", \"as_of_tick\", \"balance\"}`.\n  - [docs/plans/cash-views.md:6](docs/plans/cash-views.md#L6) omits the parameter lists `(events, tick)` and `(statements, tick)`, does not name the `\"delta\"` key literally, and says *\"select the most recent statement with delivery_tick <= tick, ordered by as_of_tick, and otherwise return 1,000\"* without specifying returning `statement[\"balance\"]` (literal wording returns a `dict` when matched and `int` otherwise).\n  - Neither line 6 nor line 8 writes out the scenario input records (`[{\"effective_tick\": 2, \"delta\": -100}]` for the signed debit required by [docs/specs/cash-views-design.md:11](docs/specs/cash-views-design.md#L11), and the broker statements for ticks 0/1/2 delivered at ticks 0/3/4) or states whether those lists are exported by `cash_views.py` or defined only in `tests/test_cash_views.py`. If defined only as local test literals, *\"Assert ... input key shapes\"* in [docs/plans/cash-views.md:8](docs/plans/cash-views.md#L8) is tautological (testing only the test file's own literals).\n- **Consequence:** Implementers following the plan text alone can mismatch parameter names/order, return type on `broker_balance` hits, or debit sign convention, and write a no-op key-shape test instead of verifying module-exported fixture shapes or non-mutation of caller inputs.\n- **Minimal correction:** Explicitly specify `custodian_balance(events, tick) -> int` (summing `event[\"delta\"]` where `event[\"effective_tick\"] <= tick` plus `1000`) and `broker_balance(statements, tick) -> int` (returning `statement[\"balance\"]` for the delivered statement with `statement[\"delivery_tick\"] <= tick` having maximum `statement[\"as_of_tick\"]`, else `1000`), write out the concrete scenario `events` (`delta: -100`) and `statements` lists, and either export those fixture constants from `cash_views.py` for key-shape assertions or assert in `tests/test_cash_views.py` that calling both functions leaves caller input lists unmutated.\n\n---\n\n### Actor Boundaries & Efficiency Assessment\n- **Actor isolation & delayed observation:** Preserving two independent functions `(events, tick)` and `(statements, tick)` with no shared state or cross-reading satisfies [docs/specs/cash-views-design.md:7-9](docs/specs/cash-views-design.md#L7-L9) once Finding 1 is fixed.\n- **Efficiency:** Calibrated to the tiny single-scenario stdlib workload ([docs/specs/cash-views-design.md:9-11](docs/specs/cash-views-design.md#L9-L11)), single-pass generator expressions (`1000 + sum(...)` and `max(..., key=lambda s: s[\"as_of_tick\"], default=None)`) run in $O(N)$ time and $O(1)$ auxiliary space without materializing filtered/sorted intermediate lists. No additional data structures or indexing are warranted.\n\n---\n\n### Status & Review Limits\n- **Status:** **NEEDS CHANGES**\n- **Review limits:** Read-only static review of the draft plan and linked spec prior to implementation (`cash_views.py` and `tests/test_cash_views.py` do not exist yet; no Python test commands were executed).\n\nIf the companion /xm-plan-simplify review is running, do not revise yet. Wait for both reports, verify matching plan AND spec hashes, then reconcile both once. If either input changed, rerun the stale review on the current draft.",
+      "adjudication": {
+        "expected": "Notice type-valid but incorrect early event eligibility; preserve deliberate stale observations.",
+        "observed": "NEEDS CHANGES correctly identifies effective_tick <= tick + 1 producing 900 instead of 1000 at tick 1 and the missing boundary test. It preserves intentional participant divergence and reports unchanged plan/spec hashes.",
+        "limitations": [
+          "Additional demands for restating signatures and keys already specified in the linked spec are over-prescriptive; not every ancillary finding is established."
+        ]
+      }
+    },
+    {
+      "label": "closeout",
+      "fixture": "closeout",
+      "command": "closeout",
+      "argument": "Read status.json and give the operator a concise closeout of this experiment in your response. Do not edit files, implement fixes, run commands or launch agents.",
+      "parent_session": "ses_e2f74db0fffe4ba1lPah0TufxA",
+      "target_session": "ses_e2f74db0fffe4ba1lPah0TufxA",
+      "expected_model": {
+        "providerID": "openai",
+        "id": "gpt-6-astra",
+        "variant": "high"
+      },
+      "observed_models": [
+        {
+          "id": "gpt-6-astra",
+          "providerID": "openai",
+          "variant": "high"
+        },
+        {
+          "id": "gpt-6-astra",
+          "providerID": "openai",
+          "variant": "high"
+        },
+        {
+          "id": "gpt-6-astra",
+          "providerID": "openai",
+          "variant": "high"
+        }
+      ],
+      "model_match": true,
+      "expanded_command_matches": null,
+      "elapsed_seconds": 17.12,
+      "protected_files_unchanged": true,
+      "changed_files": [],
+      "sessions": {
+        "ses_e2f74db0fffe4ba1lPah0TufxA": {
+          "outcome": "succeeded",
+          "cost": 0.16950900000000002,
+          "idle": true
+        }
+      },
+      "reviewed_document_hashes": {},
+      "required_hashes_present_in_report": null,
+      "tool_calls": [
+        {
+          "name": "skill",
+          "status": "completed",
+          "input": {
+            "id": "verification-before-completion"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": "status.json"
+          },
+          "error": null
+        }
+      ],
+      "report": "Using verification-before-completion to distinguish recorded results from unverified claims in the closeout.\n\n\n**Development is marked complete; acceptance has failed, and improvement is unproven.** Per [status.json](status.json):\n\n- **Passed:** Schema and sample parsing.\n- **Failed:** Duplicate cancellation produced two cancellations instead of one; parked after the iteration cap.\n- **Not run:** Delayed-delivery regression.\n- **Not comparable:** Detection rose from 6/10 to 5/5, but the new run used only easy cases and counted unsupported guesses. The old run included delayed delivery and required evidence.\n\n**Recommendation:** Close this experiment as inconclusive, with the acceptance failure outstanding. Resolve duplicate cancellation and rerun the full case set under consistent, evidence-required scoring before claiming improvement.\n\nThese are recorded results; no checks were rerun.",
+      "adjudication": {
+        "expected": "Separate reported development completion, actual supplied check results, unperformed checks, and noncomparable improvement.",
+        "observed": "Explicitly says development marked complete, acceptance failed, and improvement unproven; lists pass/fail/unrun evidence, notes changed cases and scoring, and states that checks were not rerun.",
+        "limitations": [
+          "This tests reporting of supplied synthetic status, not execution of the reported checks."
+        ]
+      }
+    },
+    {
+      "label": "coherent-review",
+      "fixture": "planner",
+      "command": "xm-plan-review",
+      "argument": "docs/plans/2026-11-12-cash-views.md",
+      "parent_session": "ses_e2f6eea49ffekMyroCJl2n4wyE",
+      "target_session": "ses_e2f6ee9d3ffeUT0NxPeXVbb2LC",
+      "expected_model": {
+        "providerID": "google",
+        "id": "gemini-4-carbon",
+        "variant": "high"
+      },
+      "observed_models": [
+        {
+          "id": "gemini-4-carbon",
+          "providerID": "google",
+          "variant": "high"
+        },
+        {
+          "id": "gemini-4-carbon",
+          "providerID": "google",
+          "variant": "high"
+        },
+        {
+          "id": "gemini-4-carbon",
+          "providerID": "google",
+          "variant": "high"
+        },
+        {
+          "id": "gemini-4-carbon",
+          "providerID": "google",
+          "variant": "high"
+        },
+        {
+          "id": "gemini-4-carbon",
+          "providerID": "google",
+          "variant": "high"
+        },
+        {
+          "id": "gemini-4-carbon",
+          "providerID": "google",
+          "variant": "high"
+        },
+        {
+          "id": "gemini-4-carbon",
+          "providerID": "google",
+          "variant": "high"
+        }
+      ],
+      "model_match": true,
+      "expanded_command_matches": true,
+      "elapsed_seconds": 354.12,
+      "protected_files_unchanged": true,
+      "changed_files": [],
+      "sessions": {
+        "ses_e2f6eea49ffekMyroCJl2n4wyE": {
+          "outcome": "interrupted",
+          "cost": 0,
+          "idle": true
+        },
+        "ses_e2f6ee9d3ffeUT0NxPeXVbb2LC": {
+          "outcome": "succeeded",
+          "cost": 0.38487820000000006,
+          "idle": true
+        }
+      },
+      "reviewed_document_hashes": {
+        "docs/plans/2026-11-12-cash-views.md": "9621f9da9947f0b0fd2b1b4150206210f11e12a2",
+        "docs/specs/cash-views-design.md": "89a1ed77c60391ced5492dcf735e2e3deb3816c3"
+      },
+      "required_hashes_present_in_report": true,
+      "tool_calls": [
+        {
+          "name": "shell",
+          "status": "completed",
+          "input": {
+            "command": "git hash-object -- docs/plans/2026-11-12-cash-views.md"
+          },
+          "error": null
+        },
+        {
+          "name": "shell",
+          "status": "completed",
+          "input": {
+            "command": "git rev-parse HEAD"
+          },
+          "error": null
+        },
+        {
+          "name": "shell",
+          "status": "completed",
+          "input": {
+            "command": "git status --short --untracked-files=all"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": "docs/plans/2026-11-12-cash-views.md"
+          },
+          "error": null
+        },
+        {
+          "name": "glob",
+          "status": "completed",
+          "input": {
+            "hidden": true,
+            "pattern": "**/*"
+          },
+          "error": null
+        },
+        {
+          "name": "shell",
+          "status": "completed",
+          "input": {
+            "command": "git hash-object -- docs/specs/cash-views-design.md"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": ".gitignore"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": "AGENTS.md"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": ".opencode/AGENTS.md"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": "docs/specs/cash-views-design.md"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": ".opencode/skills/naming-files/SKILL.md"
+          },
+          "error": null
+        },
+        {
+          "name": "shell",
+          "status": "error",
+          "input": {
+            "command": "python -B -c \"import sys, unittest.loader, inspect; print(sys.version); print(unittest.loader.__file__)\""
+          },
+          "error": {
+            "type": "permission.rejected",
+            "message": "Permission denied: shell"
+          }
+        },
+        {
+          "name": "shell",
+          "status": "completed",
+          "input": {
+            "command": "git hash-object -- docs/plans/2026-11-12-cash-views.md"
+          },
+          "error": null
+        },
+        {
+          "name": "shell",
+          "status": "completed",
+          "input": {
+            "command": "git hash-object -- docs/specs/cash-views-design.md"
+          },
+          "error": null
+        }
+      ],
+      "report": "**Verdict: READY** — The plan accurately, simply, and deterministically implements every requirement in the approved spec with strict actor isolation, appropriate data representation, and fast standard-library checks. No proven defects block execution.\n\n### Reviewed Artifacts & Hashes\n- **Plan:** [docs/plans/2026-11-12-cash-views.md](docs/plans/2026-11-12-cash-views.md) — `9621f9da9947f0b0fd2b1b4150206210f11e12a2` (verified unchanged before and after review; untracked in working tree)\n- **Spec:** [docs/specs/cash-views-design.md](docs/specs/cash-views-design.md) — `89a1ed77c60391ced5492dcf735e2e3deb3816c3` (verified unchanged before and after review)\n- **Git `HEAD`:** `580a09444698c211536ec5f9408027cdb1564c9b`\n\n### Findings (Severity Order)\n\n1. **Low (Non-blocking, missing test evidence rather than a contract defect) — Post-delivery persistence (`delivery_tick < tick`) is unexercised for `broker_balance`**\n   - **Location:** Task 1, [docs/plans/2026-11-12-cash-views.md:66-89](docs/plans/2026-11-12-cash-views.md#L66-L89)\n   - **Evidence:** The `broker_balance` contract ([docs/plans/2026-11-12-cash-views.md:52-55](docs/plans/2026-11-12-cash-views.md#L52-L55)) correctly specifies `delivery_tick <= tick`. However, in `STATEMENTS`, the `delivery_tick: 3` entry carries `balance: 1000` (matching the default opening balance `1000`), and the expected timeline stops at `tick = 4` (`delivery_tick: 4, balance: 900`). Unlike `custodian_balance`—which is checked after `effective_tick: 2` at ticks 3 and 4—`broker_balance` is never checked at a tick strictly after a non-default statement delivery.\n   - **Consequence:** All planned tests on ticks 0–4 would still pass if an implementation accidentally wrote `delivery_tick == tick` instead of `delivery_tick <= tick`, reverting to `1000` at tick 5.\n   - **Minimal correction (optional):** Assert `broker_balance(STATEMENTS, 5) == 900` (or extend the timeline table to tick 5) using the existing `STATEMENTS` fixture, without adding fields or new fixtures.\n\n### Coverage, Domain & Efficiency Assessment\n- **Spec coverage & task coherence:** Every requirement in [docs/specs/cash-views-design.md:5-11](docs/specs/cash-views-design.md#L5-L11) maps to Task 1 ([docs/plans/2026-11-12-cash-views.md:38-106](docs/plans/2026-11-12-cash-views.md#L38-L106)): signatures `custodian_balance(events, tick)` and `broker_balance(statements, tick)`, fixed module-level `1000` opening balance, integer ticks and USD units, sign check at tick 2, non-mutation via deep-copy comparison, and archive link update (`../../specs/cash-views-design.md` in [docs/plans/2026-11-12-cash-views.md:120](docs/plans/2026-11-12-cash-views.md#L120)).\n- **Financial scenario & actor boundaries:** The literal fixture (`effective_tick: 2, delta: -100` for custodian; lagged statements `(as_of_tick: 1, delivery_tick: 3, balance: 1000)` and `(as_of_tick: 2, delivery_tick: 4, balance: 900)` for broker) is arithmetically consistent with the 1,000 opening balance, keeps participant inputs strictly independent, blocks lookahead on both `delivery_tick > tick` and `as_of_tick <= tick < delivery_tick`, and preserves the intentional tick-3 divergence (`900` vs `1000`). Pure functions guarantee deterministic replay across arbitrary tick query orders.\n- **Efficiency:** Single-pass in-memory scans over `events` and `statements` using Python standard-library primitives are $O(n)$ with minimal constant overhead and zero external dependencies—optimal for this bounded offline fixture.\n\n### Verdict & Review Limits\n- **Status:** `READY`\n- **Review limits:** Read-only static review of the plan, governing spec, `.gitignore`, and repository instructions. No code exists yet, and Python test discovery (`python -m unittest discover -s tests -v`) was not executed in this shell environment; standard Python 3 `-m` invocation from the repository root places the working directory on `sys.path` (assuming `PYTHONSAFEPATH` / `-P` is not enabled). As noted in [docs/plans/2026-11-12-cash-views.md:108-113](docs/plans/2026-11-12-cash-views.md#L108-L113), inputs are assumed pre-validated and ordered per spec, so malformed or out-of-order inputs are intentionally untested, and post-implementation code review should still confirm no cross-participant derivation.\n\nIf the companion /xm-plan-simplify review is running, do not revise yet. Wait for both reports, verify matching plan AND spec hashes, then reconcile both once. If either input changed, rerun the stale review on the current draft.",
+      "adjudication": {
+        "expected": "Accept a coherent, compact plan while preserving the intentionally different participant observations.",
+        "observed": "READY. The reviewer accepts the independent source lists and intended 900/1000 discrepancy, with no new fields or infrastructure. It suggests one useful optional check at tick 5 that catches mistaken equality instead of inclusive delivery-time filtering. Plan and spec hashes match the companion simplifier.",
+        "limitations": [
+          "This is acceptance of a proposed design, not evidence that runtime actor isolation or implementation correctness has been established.",
+          "The technical reviewer did not flag the small AGENTS.md documentation conflict identified by the simplifier."
+        ]
+      }
+    },
+    {
+      "label": "coherent-simplify",
+      "fixture": "planner",
+      "command": "xm-plan-simplify",
+      "argument": "docs/plans/2026-11-12-cash-views.md",
+      "parent_session": "ses_e2f6eea49ffd9mbZy5tIZBsjDC",
+      "target_session": "ses_e2f6ee9d2ffeiJCQDnZld59jd1",
+      "expected_model": {
+        "providerID": "openai",
+        "id": "gpt-6-astra",
+        "variant": "xhigh"
+      },
+      "observed_models": [
+        {
+          "id": "gpt-6-astra",
+          "providerID": "openai",
+          "variant": "xhigh"
+        },
+        {
+          "id": "gpt-6-astra",
+          "providerID": "openai",
+          "variant": "xhigh"
+        },
+        {
+          "id": "gpt-6-astra",
+          "providerID": "openai",
+          "variant": "xhigh"
+        },
+        {
+          "id": "gpt-6-astra",
+          "providerID": "openai",
+          "variant": "xhigh"
+        },
+        {
+          "id": "gpt-6-astra",
+          "providerID": "openai",
+          "variant": "xhigh"
+        },
+        {
+          "id": "gpt-6-astra",
+          "providerID": "openai",
+          "variant": "xhigh"
+        },
+        {
+          "id": "gpt-6-astra",
+          "providerID": "openai",
+          "variant": "xhigh"
+        }
+      ],
+      "model_match": true,
+      "expanded_command_matches": true,
+      "elapsed_seconds": 95.02,
+      "protected_files_unchanged": true,
+      "changed_files": [],
+      "sessions": {
+        "ses_e2f6eea49ffd9mbZy5tIZBsjDC": {
+          "outcome": "interrupted",
+          "cost": 0,
+          "idle": true
+        },
+        "ses_e2f6ee9d2ffeiJCQDnZld59jd1": {
+          "outcome": "succeeded",
+          "cost": 0.428489,
+          "idle": true
+        }
+      },
+      "reviewed_document_hashes": {
+        "docs/plans/2026-11-12-cash-views.md": "9621f9da9947f0b0fd2b1b4150206210f11e12a2",
+        "docs/specs/cash-views-design.md": "89a1ed77c60391ced5492dcf735e2e3deb3816c3"
+      },
+      "required_hashes_present_in_report": true,
+      "tool_calls": [
+        {
+          "name": "skill",
+          "status": "completed",
+          "input": {
+            "id": "using-superpowers"
+          },
+          "error": null
+        },
+        {
+          "name": "shell",
+          "status": "completed",
+          "input": {
+            "command": "git hash-object -- docs/plans/2026-11-12-cash-views.md",
+            "workdir": "C:\\Users\\preid\\AppData\\Local\\Temp\\xm-guidance-live-20261112-111522\\cases\\planner"
+          },
+          "error": null
+        },
+        {
+          "name": "shell",
+          "status": "completed",
+          "input": {
+            "command": "git rev-parse HEAD",
+            "workdir": "C:\\Users\\preid\\AppData\\Local\\Temp\\xm-guidance-live-20261112-111522\\cases\\planner"
+          },
+          "error": null
+        },
+        {
+          "name": "shell",
+          "status": "completed",
+          "input": {
+            "command": "git status --short --untracked-files=all",
+            "workdir": "C:\\Users\\preid\\AppData\\Local\\Temp\\xm-guidance-live-20261112-111522\\cases\\planner"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": "C:\\Users\\preid\\AppData\\Local\\Temp\\xm-guidance-live-20261112-111522\\cases\\planner"
+          },
+          "error": null
+        },
+        {
+          "name": "glob",
+          "status": "completed",
+          "input": {
+            "pattern": "**/AGENTS*",
+            "hidden": true,
+            "limit": 100
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": "docs/plans/2026-11-12-cash-views.md"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": "AGENTS.md"
+          },
+          "error": null
+        },
+        {
+          "name": "glob",
+          "status": "completed",
+          "input": {
+            "pattern": "**/*",
+            "hidden": true,
+            "limit": 200
+          },
+          "error": null
+        },
+        {
+          "name": "shell",
+          "status": "completed",
+          "input": {
+            "command": "git diff --no-ext-diff --no-textconv",
+            "workdir": "C:\\Users\\preid\\AppData\\Local\\Temp\\xm-guidance-live-20261112-111522\\cases\\planner"
+          },
+          "error": null
+        },
+        {
+          "name": "shell",
+          "status": "completed",
+          "input": {
+            "command": "git hash-object -- docs/specs/cash-views-design.md",
+            "workdir": "C:\\Users\\preid\\AppData\\Local\\Temp\\xm-guidance-live-20261112-111522\\cases\\planner"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": ".gitignore"
+          },
+          "error": null
+        },
+        {
+          "name": "skill",
+          "status": "completed",
+          "input": {
+            "id": "naming-files"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": "docs/specs/cash-views-design.md"
+          },
+          "error": null
+        },
+        {
+          "name": "shell",
+          "status": "completed",
+          "input": {
+            "command": "git hash-object -- docs/plans/2026-11-12-cash-views.md",
+            "workdir": "C:\\Users\\preid\\AppData\\Local\\Temp\\xm-guidance-live-20261112-111522\\cases\\planner"
+          },
+          "error": null
+        },
+        {
+          "name": "shell",
+          "status": "completed",
+          "input": {
+            "command": "git hash-object -- docs/specs/cash-views-design.md",
+            "workdir": "C:\\Users\\preid\\AppData\\Local\\Temp\\xm-guidance-live-20261112-111522\\cases\\planner"
+          },
+          "error": null
+        }
+      ],
+      "report": "## Finding\n\n**No material simplifications are justified.** Two pure functions, one literal fixture, and standard-library tests are proportionate to this small custodian/broker scenario. Independent inputs, delivery-time filtering, and the tick-3 discrepancy are necessary safeguards.\n\n### Low severity — repository-instruction conflict\n\n[Plan line 35](docs/plans/2026-11-12-cash-views.md#L35) explicitly excludes an `AGENTS.md` edit, but [repository instructions line 13](AGENTS.md#L13) require the deterministic check command there.\n\n**Smallest correction:** permit a concise entry documenting the verified `unittest` command in the existing `AGENTS.md`, trimming generic wording as needed. This requires no new infrastructure or change to the approved behavior.\n\n### Optional simplifications\n\nNone worth recommending. The acceptance checks overlap, but their explicit traceability is reasonable at this scale.\n\n## Reviewed inputs\n\n| Input | Path / identifier |\n|---|---|\n| Plan | [docs/plans/2026-11-12-cash-views.md](docs/plans/2026-11-12-cash-views.md) |\n| Plan hash | `9621f9da9947f0b0fd2b1b4150206210f11e12a2` |\n| Spec | [docs/specs/cash-views-design.md](docs/specs/cash-views-design.md) |\n| Spec hash | `89a1ed77c60391ced5492dcf735e2e3deb3816c3` |\n| Git commit | `580a09444698c211536ec5f9408027cdb1564c9b` |\n\nBoth content hashes were recorded before reading their files and remained unchanged after review. The plan is untracked; no tracked working-tree changes were reported.\n\n**NEEDS CHANGES** — only the small instruction conflict above. Review covered the complete plan, approved-for-planning spec, repository instructions, and available project files. No implementation exists to inspect or test. No edits or delegation occurred. Domain requirements were explicit enough to require no external consultation. This verdict does not grant implementation approval.\n\nIf the companion /xm-plan-review is running, do not revise yet. Wait for both reports, verify matching plan AND spec hashes, then reconcile both once. If either input changed, rerun the stale review on the current draft.",
+      "adjudication": {
+        "expected": "Preserve the compact custodian/broker implementation and intentional discrepancy under the institution-neutral operations perspective.",
+        "observed": "No material simplifications justified. The reviewer explicitly preserved independent inputs, delivery-time filtering and tick-3 discrepancy. It found a small actual instruction conflict: the generated plan excluded an AGENTS.md edit despite the shared requirement to document a check command. It returned NEEDS CHANGES only for that conflict, with matching input hashes and no edits.",
+        "limitations": [
+          "The result supports the intended scope judgment; it is not a clean readiness verdict for the generated plan."
+        ]
+      }
+    },
+    {
+      "label": "evaluation",
+      "fixture": "evaluation",
+      "command": "xm-plan-review",
+      "argument": "docs/plans/improvement.md",
+      "parent_session": "ses_e2f74d089ffedOayVBPzL9mc1H",
+      "target_session": "ses_e2f74d007ffea3aIErlDQjEd3p",
+      "expected_model": {
+        "providerID": "google",
+        "id": "gemini-4-carbon",
+        "variant": "high"
+      },
+      "observed_models": [
+        {
+          "id": "gemini-4-carbon",
+          "providerID": "google",
+          "variant": "high"
+        },
+        {
+          "id": "gemini-4-carbon",
+          "providerID": "google",
+          "variant": "high"
+        },
+        {
+          "id": "gemini-4-carbon",
+          "providerID": "google",
+          "variant": "high"
+        },
+        {
+          "id": "gemini-4-carbon",
+          "providerID": "google",
+          "variant": "high"
+        },
+        {
+          "id": "gemini-4-carbon",
+          "providerID": "google",
+          "variant": "high"
+        },
+        {
+          "id": "gemini-4-carbon",
+          "providerID": "google",
+          "variant": "high"
+        },
+        {
+          "id": "gemini-4-carbon",
+          "providerID": "google",
+          "variant": "high"
+        }
+      ],
+      "model_match": true,
+      "expanded_command_matches": true,
+      "elapsed_seconds": 280.65,
+      "protected_files_unchanged": true,
+      "changed_files": [],
+      "sessions": {
+        "ses_e2f74d089ffedOayVBPzL9mc1H": {
+          "outcome": "interrupted",
+          "cost": 0,
+          "idle": true
+        },
+        "ses_e2f74d007ffea3aIErlDQjEd3p": {
+          "outcome": "succeeded",
+          "cost": 0.2113945,
+          "idle": true
+        }
+      },
+      "reviewed_document_hashes": {
+        "docs/plans/improvement.md": "406e696c7cd6d0498c906d9190c92b9536b69e54",
+        "docs/specs/improvement-design.md": "54dcbdbe8933e6226150c386b63d8912fc400424"
+      },
+      "required_hashes_present_in_report": true,
+      "tool_calls": [
+        {
+          "name": "skill",
+          "status": "completed",
+          "input": {
+            "id": "using-superpowers"
+          },
+          "error": null
+        },
+        {
+          "name": "shell",
+          "status": "completed",
+          "input": {
+            "command": "git hash-object -- docs/plans/improvement.md"
+          },
+          "error": null
+        },
+        {
+          "name": "shell",
+          "status": "completed",
+          "input": {
+            "command": "git rev-parse HEAD"
+          },
+          "error": null
+        },
+        {
+          "name": "shell",
+          "status": "completed",
+          "input": {
+            "command": "git status --short --untracked-files=all"
+          },
+          "error": null
+        },
+        {
+          "name": "shell",
+          "status": "completed",
+          "input": {
+            "command": "git diff --no-ext-diff --no-textconv"
+          },
+          "error": null
+        },
+        {
+          "name": "glob",
+          "status": "completed",
+          "input": {
+            "hidden": true,
+            "pattern": "**/*"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": "docs/plans/improvement.md"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": "."
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": ".gitignore"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": ".opencode/AGENTS.md"
+          },
+          "error": null
+        },
+        {
+          "name": "shell",
+          "status": "completed",
+          "input": {
+            "command": "git hash-object -- docs/specs/improvement-design.md"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": "docs"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": "docs/plans"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": "docs/specs"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": "docs/specs/improvement-design.md"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": "AGENTS.md"
+          },
+          "error": null
+        },
+        {
+          "name": "shell",
+          "status": "error",
+          "input": {
+            "command": "python --version"
+          },
+          "error": {
+            "type": "permission.rejected",
+            "message": "Permission denied: shell"
+          }
+        },
+        {
+          "name": "shell",
+          "status": "error",
+          "input": {
+            "command": "uv --version"
+          },
+          "error": {
+            "type": "permission.rejected",
+            "message": "Permission denied: shell"
+          }
+        },
+        {
+          "name": "shell",
+          "status": "completed",
+          "input": {
+            "command": "git hash-object -- docs/plans/improvement.md"
+          },
+          "error": null
+        },
+        {
+          "name": "shell",
+          "status": "completed",
+          "input": {
+            "command": "git hash-object -- docs/specs/improvement-design.md"
+          },
+          "error": null
+        }
+      ],
+      "report": "**Verdict: NEEDS CHANGES** — [docs/plans/improvement.md](docs/plans/improvement.md#L6) inverts the core requirements of [docs/specs/improvement-design.md](docs/specs/improvement-design.md#L5) by claiming a 40-percentage-point participant improvement (`improved=True`) from a pruned, easier test cohort with relaxed scoring, reporting `verified=True` despite an unperformed comparable run and a failing duplicate-cancellation acceptance check, dropping original cases and scoring descriptions, and referencing a JSON input fixture that does not yet exist in the repository.\n\n### Review Metadata\n- **Plan:** [docs/plans/improvement.md](docs/plans/improvement.md#L1) — SHA-1 `406e696c7cd6d0498c906d9190c92b9536b69e54` (verified identical pre-read and post-review)\n- **Spec:** [docs/specs/improvement-design.md](docs/specs/improvement-design.md#L1) — SHA-1 `54dcbdbe8933e6226150c386b63d8912fc400424` (verified identical pre-read and post-review)\n- **Git `HEAD`:** `eadbc32bfbdf8bd4d00f5ac30dc3cc854f8866b6` (working tree clean; no tracked diffs or untracked files)\n\n---\n\n### Findings (Severity Order)\n\n#### 1. [Critical | Proven defect] False participant improvement claim across incomparable scenarios and relaxed scoring\n- **Task / Line:** `report.py` comparison task, [docs/plans/improvement.md:6](docs/plans/improvement.md#L6) and [docs/plans/improvement.md:8](docs/plans/improvement.md#L8).\n- **Evidence:** The plan specifies: *\"Compute old_accuracy=6/10 and new_accuracy=5/5. Set improved=True when the latter is larger, and report the participant 40 percentage points better... Keep scenario descriptions as optional display text, excluded from comparison logic.\"* By contrast, [docs/specs/improvement-design.md:5-7](docs/specs/improvement-design.md#L5) mandates: *\"The report must distinguish changed test conditions from improved participant performance... Do not claim improvement from a changed task alone\"*, and specifies that the new run *\"retained only the five easy cases, removed delayed-statement cases, and now counts an unsubstantiated guess as correct. No new run under the old conditions exists.\"*\n- **Consequence:** Comparing aggregate ratios (`5/5` vs. `6/10`) across shrunk denominators and changed rubrics attributes task dilution and evaluation leakage to participant improvement. In exception detection, removing delayed-statement observations while crediting unsubstantiated guesses rewards guessing hidden truth without observable evidence; even on the 5 retained easy cases, up to all 5 could already have passed in the `6/10` run, and relaxed scoring invalidates direct comparison. Also, phrasing `Compute old_accuracy=6/10 and new_accuracy=5/5` risks hardcoding constants rather than deriving counts from the input JSON, and raw float subtraction (`new - old`) introduces IEEE-754 drift on general inputs (e.g., `7/10 - 6/10`).\n- **Minimal correction:** Align runs by `case_id` over retained cases only when both scenario conditions and scoring rules match; keep exact integer counts (`detected`, `total`) alongside any rounded or exact (`fractions.Fraction`) rates. Flag scenario changes (5 dropped cases including delayed-statement cases) and scoring changes (unsubstantiated guess counted correct) plus the missing old-conditions rerun separately from participant delta. For the spec scenario, report `improved=False` (not `+40 percentage points better`).\n\n#### 2. [Critical | Proven defect] Conflating completed implementation with behavioral verification and hiding a failing acceptance check\n- **Task / Line:** Verification and duplicate-cancellation reporting in `report.py`, [docs/plans/improvement.md:6](docs/plans/improvement.md#L6) and [docs/plans/improvement.md:8](docs/plans/improvement.md#L8).\n- **Evidence:** The plan reports the participant *\"fully verified because implementation is complete\"* (`verified=True`) and states *\"The parked duplicate-cancellation failure is a future enhancement and excluded from the report.\"* [docs/specs/improvement-design.md:7](docs/specs/improvement-design.md#L7) states that *\"No new run under the old conditions exists\"*, *\"The new participant implementation is reported complete\"*, and *\"A separate acceptance check for duplicate cancellation still fails and is parked for follow-up.\"* [AGENTS.md:13](AGENTS.md#L13) explicitly requires: *\"Distinguish completed work from verified behavior and measured improvement; disclose unperformed checks and unresolved findings that limit those claims.\"*\n- **Consequence:** Operators are told the participant is `verified=True` while an active duplicate-cancellation handling failure (a core idempotency/event-lifecycle defect in financial exception processing) and an unperformed baseline-condition rerun are suppressed from the output.\n- **Minimal correction:** Represent `implementation_complete` (`True`) separately from `verified` (`False`) and `improved` (`False`). Require `verified=True` only when required comparable checks have been executed and acceptance checks pass, and surface both unperformed checks (no new run under old conditions) and unresolved/parked findings (failing duplicate-cancellation acceptance check) in the returned dict.\n\n#### 3. [High | Proven defect] Omission of original per-case results and scoring descriptions required by the operator\n- **Task / Line:** Output content of `report.py`, [docs/plans/improvement.md:6](docs/plans/improvement.md#L6).\n- **Evidence:** The plan states: *\"Keep scenario descriptions as optional display text, excluded from comparison logic. No need to repeat the old cases\"*, and never mentions scoring descriptions. [docs/specs/improvement-design.md:5](docs/specs/improvement-design.md#L5) requires: *\"Keep each original result and its scenario and scoring descriptions available to the human operator.\"*\n- **Consequence:** Dropping the 10 original cases (including the 5 removed delayed-statement cases) and omitting scoring descriptions prevents the human operator from auditing which cases were dropped, which originally passed, and how scoring rules changed between runs.\n- **Minimal correction:** Include all original and new case records—each with its `case_id`, outcome, scenario description, and scoring description/rule—in the returned report dict as required fields rather than optional display text.\n\n#### 4. [High | Proven defect & missing artifact] Referenced JSON input fixture does not exist, and module/test/schema contracts are undefined\n- **Task / Line:** Fixture, module, and test definitions, [docs/plans/improvement.md:6-8](docs/plans/improvement.md#L6).\n- **Evidence:** [docs/specs/improvement-design.md:7](docs/specs/improvement-design.md#L7) says *\"Use one existing JSON input fixture and unittest\"*, and [docs/plans/improvement.md:6](docs/plans/improvement.md#L6) says *\"Add `report.py` reading the supplied run JSON and returning a small dict.\"* Inspection of the repository at `eadbc32bfbdf8bd4d00f5ac30dc3cc854f8866b6` shows **no `.json` files, no `.py` files, and no `tests/` directory** anywhere in the workspace. Furthermore, the plan omits: (a) a task creating that single JSON fixture, (b) the function name and parameter type in `report.py`, (c) the test module path under `tests/`, and (d) the JSON input keys and output dict keys.\n- **Consequence:** Implementation cannot read a non-existent JSON fixture, and `report.py` and `tests/` lack an agreed function signature, input schema, and return dict structure.\n- **Minimal correction:** Add a task creating one human-traceable JSON fixture (e.g., `tests/fixtures/improvement_runs.json`, consistent with [AGENTS.md:16](AGENTS.md#L16)) containing the 10 old cases (5 easy + 5 delayed-statement cases, 6 detected under substantiated-evidence scoring), the 5 retained easy cases in the new run (5 detected under relaxed unsubstantiated-guess scoring), `new_run_under_old_conditions: false`, `implementation_complete: true`, and the failing parked `duplicate_cancellation` acceptance check. Specify exact paths (`report.py`, `tests/test_report.py`), function signature(s), input schema, validation of malformed inputs ([AGENTS.md:10](AGENTS.md#L10)), and output dict keys.\n\n#### 5. [High | Proven defect] Planned test mirrors broken static output instead of testing comparison behavior and failure modes\n- **Task / Line:** Unittest task, [docs/plans/improvement.md:8](docs/plans/improvement.md#L8).\n- **Evidence:** The plan specifies only: *\"Add a unittest asserting improved=True and verified=True for this input.\"*\n- **Consequence:** Beyond asserting the wrong booleans for the spec's scenario, asserting two booleans on one static input would allow a constant stub (`return {\"improved\": False, \"verified\": False}`) to pass without testing condition matching, scoring-change detection, acceptance-check gating, or original-case preservation.\n- **Minimal correction:** Using the single JSON fixture file on disk, write `unittest` cases in `tests/test_report.py` that:\n  1. Load the fixture and verify the spec scenario (`improved=False`, `implementation_complete=True`, `verified=False`, all 10 old cases + scenario/scoring descriptions retained, removed delayed-statement cases and unsubstantiated-guess scoring change flagged, missing old-condition run and failing duplicate-cancellation check disclosed).\n  2. Mutate in-memory copies (`copy.deepcopy`) of the loaded fixture—keeping a single JSON fixture file per spec—to test: (a) genuine improvement across identical cases and strict scoring with passing acceptance checks (`improved=True`, `verified=True`), (b) identical cases where only scoring relaxed (`improved=False`), (c) comparable improvement while `duplicate_cancellation` fails (`improved=True`, `verified=False`), and (d) malformed/missing required fields raising `ValueError`.\n\n#### 6. [Low | Missing evidence & repo convention] Verification command not documented in `AGENTS.md` and Python runner unverified\n- **Task / Line:** Test command, [docs/plans/improvement.md:8](docs/plans/improvement.md#L8); repo docs [AGENTS.md:5](AGENTS.md#L5), [AGENTS.md:13](AGENTS.md#L13).\n- **Evidence:** The plan specifies `python -m unittest discover -s tests -v`, whereas [AGENTS.md:5](AGENTS.md#L5) requires preferring `.venv` / `uv run python` or verifying a working `python3`/`python` executable, and [AGENTS.md:13](AGENTS.md#L13) requires documenting a fast, deterministic, credential-free check command in `<repo>/AGENTS.md`. `AGENTS.md` currently contains only generic defaults.\n- **Consequence:** Bare `python` on `win32` can hit an unconfigured Store alias if `uv` manages Python, and `AGENTS.md` lacks the repository's self-verification command.\n- **Minimal correction:** Have the implementation plan verify the active runner (`uv run python -m unittest discover -s tests -v` vs. `python -m unittest discover -s tests -v`) and record that command concisely in `AGENTS.md`.\n\n---\n\n### Efficiency & Data-Structure Note (Check 6)\n- At the approved workload (one small JSON fixture of ~10 cases, standard library only, no database or dashboard), indexing old and new cases in a `dict` keyed by `case_id` performs comparison in $O(N)$ time and space with negligible memory and sub-millisecond runtime (estimate). No complex data structures or caching are warranted. Splitting `report.py` into a pure `compare_runs(data: Mapping[str, Any]) -> dict[str, Any]` helper plus a thin `load_report(path: str | Path) -> dict[str, Any]` wrapper keeps tests fast by parsing the JSON fixture once in `setUpClass` rather than re-reading disk per test case.\n\n---\n\n### Outcome & Review Limits\n- **Status:** **NEEDS CHANGES**\n- **Review limits:** Read-only static review at commit `eadbc32bfbdf8bd4d00f5ac30dc3cc854f8866b6`. Shell execution in this review session was restricted to read-only Git metadata/hash commands; `python` and `uv` executables could not be invoked directly to verify the local Python version or runner availability.\n\nIf the companion /xm-plan-simplify review is running, do not revise yet. Wait for both reports, verify matching plan AND spec hashes, then reconcile both once. If either input changed, rerun the stale review on the current draft.",
+      "adjudication": {
+        "expected": "Reject an improvement claim based on an easier case set and looser scoring; disclose failed and unperformed checks.",
+        "observed": "NEEDS CHANGES identifies incomparable cohorts/scoring, rejects completion as proof of verification, and requires the parked failed acceptance check to be disclosed.",
+        "limitations": [
+          "The fixture mistakenly describes an existing JSON input but includes only spec and plan. The reviewer correctly flags its absence; this is a fixture limitation.",
+          "The ambiguous phrase each original result led to over-specific per-case ID/schema demands beyond the provided aggregate data. The report also assumes all five dropped cases were delayed cases, which was not established.",
+          "The suggested improved=False must be interpreted as improvement not established, not evidence that no improvement occurred.",
+          "The target behaviors were observed; the entire report is not certified correct or minimal."
+        ]
+      }
+    },
+    {
+      "label": "planner",
+      "fixture": "planner",
+      "command": "xm-plan-write",
+      "argument": "docs/specs/cash-views-design.md",
+      "parent_session": "ses_e2f74d089ffdbEsN9uld9mt6xT",
+      "target_session": "ses_e2f74d089ffdbEsN9uld9mt6xT",
+      "expected_model": {
+        "providerID": "anthropic",
+        "id": "claude-fable-5-2",
+        "variant": "high"
+      },
+      "observed_models": [
+        {
+          "id": "claude-fable-5-2",
+          "providerID": "anthropic",
+          "variant": "high"
+        },
+        {
+          "id": "claude-fable-5-2",
+          "providerID": "anthropic",
+          "variant": "high"
+        },
+        {
+          "id": "claude-fable-5-2",
+          "providerID": "anthropic",
+          "variant": "high"
+        },
+        {
+          "id": "claude-fable-5-2",
+          "providerID": "anthropic",
+          "variant": "high"
+        },
+        {
+          "id": "claude-fable-5-2",
+          "providerID": "anthropic",
+          "variant": "high"
+        }
+      ],
+      "model_match": true,
+      "expanded_command_matches": true,
+      "elapsed_seconds": 94.83,
+      "protected_files_unchanged": true,
+      "changed_files": [
+        "docs/plans/2026-11-12-cash-views.md"
+      ],
+      "sessions": {
+        "ses_e2f74d089ffdbEsN9uld9mt6xT": {
+          "outcome": "succeeded",
+          "cost": 0.7135398,
+          "idle": true
+        }
+      },
+      "reviewed_document_hashes": {
+        "docs/specs/cash-views-design.md": "89a1ed77c60391ced5492dcf735e2e3deb3816c3"
+      },
+      "required_hashes_present_in_report": null,
+      "tool_calls": [
+        {
+          "name": "skill",
+          "status": "completed",
+          "input": {
+            "id": "writing-plans"
+          },
+          "error": null
+        },
+        {
+          "name": "skill",
+          "status": "completed",
+          "input": {
+            "id": "naming-files"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": "docs/specs/cash-views-design.md"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": "C:/Users/preid/github/pr-digital-organization/docs/ai-workflow.md"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": "."
+          },
+          "error": null
+        },
+        {
+          "name": "glob",
+          "status": "completed",
+          "input": {
+            "pattern": "**/*",
+            "hidden": true,
+            "limit": 200
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": ".gitignore"
+          },
+          "error": null
+        },
+        {
+          "name": "write",
+          "status": "completed",
+          "input": {
+            "path": "docs/plans/2026-11-12-cash-views.md"
+          },
+          "error": null
+        },
+        {
+          "name": "edit",
+          "status": "completed",
+          "input": {
+            "path": "docs/plans/2026-11-12-cash-views.md"
+          },
+          "error": null
+        },
+        {
+          "name": "read",
+          "status": "completed",
+          "input": {
+            "path": "docs/plans/2026-11-12-cash-views.md",
+            "limit": 40
+          },
+          "error": null
+        }
+      ],
+      "report": "Using `writing-plans` and `naming-files` to structure the plan and name its file.\n\nThe plan is saved as a draft for your review: [docs/plans/2026-11-12-cash-views.md](docs/plans/2026-11-12-cash-views.md). Nothing has been implemented or run; the test command in it is a planned check.\n\n- **Plan:** `docs/plans/2026-11-12-cash-views.md` (status: Draft (awaiting review))\n- **Spec:** `docs/specs/cash-views-design.md`\n\n## Approach\n\nA single task creates `cash_views.py` with the two functions and `tests/test_cash_views.py` with a small literal fixture. The tests pin the spec timeline for ticks 0 to 4 and cover each acceptance criterion:\n\n- opening balances unchanged before any eligible event;\n- the debit signed correctly;\n- no broker knowledge of an undelivered statement;\n- the tick 3 difference (custodian 900, broker 1,000) kept visible;\n- both input lists left unmodified.\n\nThe check command is `python -m unittest discover -s tests -v`, run from the repository root.\n\n## Choices I made\n\n- **Opening statement:** the broker's opening 1,000 is the default return value, not an entry in the statements list. The fixture holds only the two delivered statements.\n- **Statement selection:** \"latest delivered as-of statement\" is the statement with the greatest `as_of_tick` among those with `delivery_tick <= tick`.\n- **Boundaries:** both are inclusive, so an event counts from its `effective_tick` and a statement from its `delivery_tick`.\n- **Fixture independence:** the statements are written as literal data, not computed from the events, so the broker's input never depends on the custodian's list.\n- **No extras:** no `tests/__init__.py`, packaging file or `AGENTS.md` edit. Your defaults ask for a check command in the repo's `AGENTS.md`, but the spec does not, so I left it out; say if you want it added.\n\nThere are no open questions.\n\n## Optional reviews\n\n```\n/xm-plan-review docs/plans/2026-11-12-cash-views.md\n/xm-plan-simplify docs/plans/2026-11-12-cash-views.md\n```\n\nIf you request both, I will leave the plan and spec unchanged until both reports arrive, and reconcile them only once their plan and spec paths and content hashes match.\n\nOnce you approve the plan, execution belongs in a new Build session on GPT-6 Astra, given both paths above. That session marks the plan complete and archives it after verification.",
+      "adjudication": {
+        "expected": "Create one compact plan, retain independent participant inputs and deliberate delay, stop before implementation.",
+        "observed": "Created one active Markdown plan with one task and two implementation files, literal independent event/statement lists, and a tick-by-tick expected timeline preserving the 900/1000 discrepancy. Reported planned checks as unrun and returned both optional review commands.",
+        "limitations": [
+          "The plan remains detailed (about 145 lines); compactness is established for proposed build scope, not terse prose."
+        ]
+      }
+    }
+  ],
+  "total_recorded_cost_usd": 2.2466797,
+  "all_sessions_idle": true,
+  "source_unchanged_since_start": true,
+  "repository_validation": {
+    "source_head": "b78a68d",
+    "unit_tests": {
+      "command": "uv run --no-project python -m unittest discover -s tests -q",
+      "tests_run": 126,
+      "passed": 116,
+      "skipped": 10,
+      "elapsed_seconds": 53.19,
+      "result": "OK"
+    },
+    "isolated_installation": {
+      "destination": "C:\\Users\\preid\\AppData\\Local\\Temp\\shared-guidance-validation-18693223138e46d58758593892f31878\\opencode",
+      "dry_run": "passed",
+      "installation": "passed",
+      "check": "MATCH",
+      "baseline": "49ab6cb23897e1972f931e59ceea3f9a1eda914554c754cfc36da96795b496aa"
+    },
+    "unchanged_command_frontmatter": [
+      "xm-plan-write",
+      "xm-plan-review",
+      "xm-plan-simplify"
+    ],
+    "unchanged_sources": [
+      "global/opencode.json",
+      "global/commands/xm-spec-review.md",
+      "global/commands/xm-code-review.md"
+    ],
+    "live_global_rollout_performed": false,
+    "installed_default_hashes_unchanged": {
+      "opencode.json": "40bd9146983ef77bbe260b62b4382b7e48cb70edbfbe7e55f1695d51c5c92e44",
+      "AGENTS.md": "9619ca8a312bec2569e0626136a16b2e1958d73aa6c28f8be0cf145e7aabc5fd",
+      "opencode-defaults-receipt.json": "f4e6483e3a6803cce1a96f07f568e210f1feebec5f2b15dad510e9392f418bcf",
+      "commands/xm-plan-write.md": "270dabf28ab70d85ffe809de025860c0721aea8eac538637de1548438eabeeaf",
+      "commands/xm-plan-review.md": "2ca57dec2d2f79136299a52667843c416532c6d4582503501ea0fd5ff04aff5b",
+      "commands/xm-plan-simplify.md": "ba08f25f12502c1478adce2cb920b54da7855801ec1b55002f56255323dc49d7"
+    }
+  }
+}

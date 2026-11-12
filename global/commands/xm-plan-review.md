@@ -49,8 +49,16 @@ Check:
 3. Tests exercise behavior and failure cases instead of mirroring implementation.
 4. Where relevant: units/currencies, rounding, calendar/time semantics, duplicate
    or out-of-order events, amendments, partial settlement, and deterministic replay.
+   For generated or simulated data, check intended relationships and event order
+   against a small, human-traceable scenario as well as types and formats. Distinguish
+   unintended inconsistencies from deliberate participant differences, delayed
+   observations and injected errors; preserve the latter. Stay within the approved
+   scenario rather than demanding extra fields or broader model coverage.
 5. Where relevant: actor boundaries, observable evidence versus hidden truth,
    evaluation leakage and whether the improvement loop measures genuine progress.
+   Where improvement is claimed, compare retained, checked examples under comparable
+   conditions and identify changes to the scenario or scoring separately from
+   participant improvement.
 6. Efficiency (simple and fast): Check for avoidable work, repeated data access
    or computation, and data structures unsuited to the expected workload. Prefer
    the simplest approach that performs well at that scale. Where a material
