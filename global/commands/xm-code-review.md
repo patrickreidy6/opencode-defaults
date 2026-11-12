@@ -57,7 +57,7 @@ Perform this review yourself, using the technical criteria in
 verification and reporting rules here override that reference. Do not dispatch
 its reviewer again. No file edits, commits, implementation or delegation. Shell
 is limited to Git inspection. Inspect supplied test/static-analysis evidence
-and test code; never claim to have run checks. For supplied results, report the
+and test code; never claim to have run tests or static analysis. For supplied results, report the
 check, outcome, evidence source and revision/content covered; distinguish
 reported results from results you inspected. Do not apply results from an older
 revision to changed code without justification. If evidence is missing or stale,
