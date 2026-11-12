@@ -1,10 +1,10 @@
 # Cross-model workflow: design record
 
-Design record for the opt-in `/xm-*` commands, verified 2026-11-11 on OpenCode 2.2.7 (Windows). Usage and the per-command model table are in the [README](../README.md#opt-in-cross-model-workflow). Implemented in [`global/commands/`](../global/commands/), the `xm-planner` and `xm-reviewer` agents in [`global/opencode.json`](../global/opencode.json), and the command copy step in [`install.py`](../install.py).
+Design record for the opt-in `/xm-*` commands, with dated verification below. Usage and the per-command model table are in the [README](../../README.md#opt-in-cross-model-workflow). Implemented in [`global/commands/`](../../global/commands/), the `xm-planner` and `xm-reviewer` agents in [`global/opencode.json`](../../global/opencode.json), and the command copy step in [`install.py`](../../install.py). The [completed initial plan](../plans/archive/cross-model-commands.md) records conversation approval; this maintained design is not a retrospective replacement for that approval source.
 
 ## Intent
 
-Add review by a different model vendor at each stage of spec-driven work, for the few projects where the extra cost is justified: foundational specs and new codebases. Ordinary Plan and Superpowers sessions remain the default and are unaffected unless a command is typed.
+Add review by a different model vendor at each stage of spec-driven work, for the few projects where the extra cost is justified: foundational specs and new codebases. Ordinary Plan and Superpowers sessions remain the default; cross-model reviews run only when a command is typed. All workflows share the document convention below unless repository instructions specify otherwise.
 
 The scope-focused refinements address Patrick's reported experience of Anthropic/Superpowers sessions asking too many questions and expanding secondary features and data fields. Astra should judge whether the build has reached a worthwhile scope for its subject matter, with a bias toward justified cuts that preserve the core payoff. Planning should preserve that balance and resolve routine technical choices without another round of product-design questions.
 
@@ -16,15 +16,23 @@ The scope-focused refinements address Patrick's reported experience of Anthropic
   | Artifact | Written by | Reviewed by |
   |---|---|---|
   | Spec | Claude Fable 5.2 | GPT-6 Astra |
-  | Plan | Claude Opus 5.5 | Gemini 4 Carbon (technical) and GPT-6 Astra (simplification) |
+  | Plan | Claude Fable 5.2 | Gemini 4 Carbon (technical) and GPT-6 Astra (simplification) |
   | Code | GPT-6 Astra, including `general` workers | Claude Fable 5.2 |
 
 - **Reviewers report and the author revises.** Review commands return findings and do not edit the artifact. The spec review ends with an explicit handoff requiring the authoring session to present scope recommendations and wait for the user's choices before editing.
 - **Spec review judges the build's value and size.** Astra identifies the core payoff, challenges unnecessary features and data fields, and recommends what to remove, shrink or defer. Essential gaps matter when they threaten the intended outcome. The report recommends a build boundary rather than assigning a generic readiness verdict. Unlike plan simplification, it may challenge the proposed requirements themselves.
-- **Planning preserves the approved scope.** Opus produces cohesive tasks, precise shared contracts and meaningful checks for a capable Astra executor. It carries forward exclusions and deferrals, justifies consequential implementation additions, and leaves routine coding choices open. The command overrides the generic `writing-plans` template's fixed review-case quota, exhaustive test-code prescriptions and execution-method menu.
+- **Planning preserves the approved scope.** Fable produces cohesive tasks, precise shared contracts and meaningful checks for a capable Astra executor. It carries forward exclusions and deferrals, justifies consequential implementation additions, and leaves routine coding choices open. The command overrides the generic `writing-plans` template's fixed review-case quota, exhaustive test-code prescriptions and execution-method menu.
 - **When both plan reviews are requested, they run on one unchanged draft.** Each reports the plan and spec content hashes and tells the parent to wait if its companion is running, so both are reconciled in one revision. A single requested review does not create a wait for an unrequested companion.
 - **High-volume work stays on OpenAI.** OpenAI usage draws on prepaid credits; Anthropic and Google are billed per call. Execution, `general` workers, `explore` and `title` run on OpenAI models, and Anthropic and Google handle the low-volume authoring and review stages.
-- **An omitted path is never guessed.** The restricted agents have no reliable way to read modification times, so a command without a path proceeds only when the Superpowers directory holds exactly one candidate.
+- **An omitted path is never guessed.** Discover only top-level Markdown documents in the applicable new and legacy directories, excluding archives, nested documents, `README.md`, `index.md` and other indexes. Spec commands inspect both `docs/specs/` and `docs/superpowers/specs/`; plan reviews inspect both `docs/plans/` and `docs/superpowers/plans/`; code review inspects all four. Proceed only when exactly one eligible candidate exists across those directories; otherwise list candidates and require an explicit path. The in-session planner retains its ability to use a spec explicitly selected in the conversation. Explicit missing paths fail without substitution.
+
+## Shared spec and plan convention
+
+The detailed convention lives in [`naming-files`](../../.opencode/skills/naming-files/SKILL.md) and applies to ordinary, XM and Superpowers work. Keep maintained specs at `docs/specs/<topic>-design.md`. Create plans at `docs/plans/YYYY-MM-DD-<topic>.md` using their creation date, with a spec link and clear status; revise an already selected active plan instead of making competing copies. Return exact saved paths and ready-to-use optional XM review commands.
+
+After implementation and verification, the Build session marks the plan complete, moves it to `docs/plans/archive/` without renaming it, and repairs links. Maintained specs remain available in `docs/specs/`; they are not archived merely because implementation is complete. `.superpowers/sdd/` remains tool-managed execution state. This convention does not modify upstream Superpowers skills or migrate other repositories.
+
+Explicit archived paths are valid review inputs. `/xm-plan-write <spec-or-plan-path>` also accepts an explicit active or archived plan and resolves its linked governing spec; if that spec cannot be resolved, request the exact spec path rather than inventing a spec or approval. When planning follow-up work from an archived plan, create a new active plan; do not revise the archive. An explicitly selected active legacy plan can still be revised in `docs/superpowers/plans/`. Preserve historical approval sources, commands and review hashes when organizing old documents; the [documentation index](../README.md) records this repository's migration.
 
 ## OpenCode behavior the design depends on
 
@@ -33,7 +41,7 @@ From the V2 [agents](https://opencode.ai/docs/agents/), [commands](https://openc
 - A session stores its own model, and selecting a primary agent does not change it. A command's `model` overrides every other model for that command, and a subagent uses its configured model. This is why the stages are commands and not primary agents with models attached.
 - The root `model` keeps no `#variant`. Agent and command model references do.
 - Variants belong to each model. Gemini 4 Carbon offers `low`, `medium` and `high` only, so its review is pinned to `high`. An unknown variant fails model resolution.
-- The built-in `plan` agent may edit only files under `~/.opencode/plan`, so it cannot save a plan in a repository. `xm-planner` may edit `docs/superpowers/plans/*.md` and nothing else, with shell and delegation denied.
+- The built-in `plan` agent may edit only files under `~/.opencode/plan`, so it cannot save a plan in a repository. `xm-planner` allows edits to `docs/plans/*.md` and `docs/superpowers/plans/*.md`, with explicit denies for both `archive/*` paths after the allow rules, and denies other edits, shell and delegation. OpenCode's [whole-value wildcards](https://opencode.ai/docs/permissions#matching) include `/`, and the last matching rule wins, so a plan-directory allow alone would also permit archive edits. New plans use `docs/plans/`; the legacy permission supports revisions to explicitly selected existing plans.
 - The built-in `plan` agent has no shell restriction. `xm-reviewer` denies edits, delegation and questions, and allows only named Git inspection commands.
 
 ## Verified on 2026-11-11
@@ -61,7 +69,33 @@ Live runs used a scratch project with the harness installed into its `.opencode`
 - A live `/xm-plan-write` run used an approved category-total CLI spec, a selected existing plan stub, and earlier conversation context proposing a database, extra fields, a dashboard and provider plugins. Opus revised only the selected plan, kept the superseded additions excluded, and produced one cohesive implementation task with concrete behavioral checks and no full test implementations.
 - Every assistant message used `anthropic/claude-opus-5-5#xhigh`; the session remained in `xm-planner`. It made no shell, subagent or question calls, labelled verification commands as planned checks, and stopped with the optional review commands and a fresh Astra Build-session handoff.
 - Session `ses_e328361dfffehih0s32b20qR8G` cost about $0.92. All 11 installer tests and `git diff --check` passed. This checks the revised prompt in isolation; it does not compare reasoning effort levels.
-- **Surface installation pending at this session's closeout:** the repository contains the refined plan writer, but `~/.config/opencode/commands/xm-plan-write.md` still contains the earlier prompt. Install the revised source before expecting the new behavior from the global command. The container rollout recorded above covered `xm-spec-review` and its reviewer profile only.
+- **Installation completed 2026-11-12:** the refined `xm-plan-write` is installed on the Surface, `sim-funds` and `sim-prime-broker`. The containers also received the `xm-planner` profile and repository-pinned Superpowers plugin, which supplies the required `writing-plans` skill. Existing settings, the spec-review command and service files were preserved, with changed configuration backed up.
+- All three installed plan-writer files matched the live-tested source SHA-256 `793769d0e9fcf231dda8164cb103af4ab3c37a3f95bc667ba01e0c249171d80a`. Verified the command, Opus 5.5 `xhigh` primary planner, restrictive planner permissions, active pinned Superpowers plugin and `writing-plans` skill in the Surface repository and at both `/home/builder` and `/workspace` in each container. These container checks establish installation and registration; the paid planning behavior check above ran on the Surface.
+
+## Document organization and Surface rollout, 2026-11-12
+
+The [document index](../README.md) records all seven moves and their approval provenance. Migration checks resolved 46 internal links and anchors, confirmed all 17 retained ignored Superpowers state files were byte-for-byte unchanged, and reproduced the original bodies of all four archived plans after reversing only added provenance/status notes and navigation repairs. Existing uncommitted Fable changes and historical installation evidence were preserved.
+
+Validation used OpenCode 2.2.7 on Windows. The unit suite ran 126 tests: 116 passed and 10 platform-specific cases were skipped. Both changed skills (`naming-files` and `project-setup`) passed `skills-ref` validation. Isolated installation and the Surface installation both returned `MATCH` for baseline `e6b2d46ff2bddd21becdae05d3ee49aa6e3b89e2d7bd4f4c8c45cf7cde594e7e`.
+
+Twelve focused live cases used scratch repositories with the shared instructions and installed harness. All five XM commands were exercised, with each command's assistant messages using its configured model and variant. All 41 file checks passed.
+
+| Case | Observed result |
+|---|---|
+| New and legacy discovery | Spec review selected the sole top-level new spec; Carbon plan review selected the sole legacy plan and its linked legacy spec. Indexes and archives were excluded. |
+| Ambiguity and missing input | Two eligible specs across new and legacy directories produced a candidate list and no selection. A missing explicit planner input failed without substitution or writes. |
+| Plan writing and revision | Omitted-path planning created one dated active plan. A conversation-selected spec revised the selected legacy plan in place. Plans had status and resolving spec links, exact optional review commands, and stopped before implementation. |
+| Archived inputs | Explicit archived simplify/code reviews left documents unchanged; code review found the planted float-arithmetic defect. Both a conversation-selected archive and a direct archived-plan argument produced new active plans with spec/provenance links, preserving archive bytes. |
+| Planner permissions | Native write attempts succeeded for active plans in both supported directories. Both archives, nested archive paths, a spec and a source file returned `permission.rejected`; disk readback confirmed the denied files were unchanged. |
+| Ordinary Superpowers | Brainstorming and `writing-plans` saved `docs/specs/total-by-category-design.md` and `docs/plans/2026-11-12-total-by-category.md`, with a resolving spec link, Draft status and exact optional XM commands. No product source files were created. |
+
+The final direct-archive and new-plan cases used planner SHA-256 `270dabf28ab70d85ffe809de025860c0721aea8eac538637de1548438eabeeaf`; the earlier missing-input and selected-plan cases preceded the direct-plan-input refinement. The subsequent built-in Plan handoff clarification was checked against its live edit permissions and the skill validator. It does not widen that agent's permissions.
+
+Useful session references: direct archive `ses_e2fd45848ffezGUsfCs8THNjTj`, new plan `ses_e2fd435f9ffeSFyk2goHfOnDhu`, permission probes `ses_e2fd49430ffeDEf340EL8FCDjg`, ordinary Superpowers `ses_e2fd48f40ffevHxd4NWWAPjiyv`, and legacy Carbon reviewer `ses_e2fd4daa7ffeMsVVcsh7X7TD9I`. Carbon reported unchanged plan hash `d170b31a5d8558fc658265fc1c66c335fcf15ed8` and spec hash `c010b7079ceea9ffc014300540c072662047c718`, plus the companion-review hold. The run used 17 sessions including parents and cost about $7.99. Scratch reports and fixture hashes are at `C:\Users\preid\AppData\Local\Temp\opencode-layout-live-20261112-093037`; all test sessions were idle at closeout. The expected ambiguous-selection parent form and automatic post-Carbon parent response were interrupted after capturing the reviewers' results.
+
+This was a filing and compatibility check, not a general certification of Superpowers planning behavior. Its ordinary workflow amended a design detail after approval and ran in-memory sample checks; upstream skills were left unchanged. Carbon attempted a disallowed Python version check, then completed with the permitted read-only tools.
+
+The Surface rollout used the standard preview and installer, with backups under `~/.config/opencode/backups/`. The loaded registry showed all five commands, Fable 5.2 `high` for `xm-planner`, both plan-directory allows followed by both archive denies, and the updated skills. All configuration outside `xm-planner` and 13 unaffected installed files were preserved, including `AGENTS.local.md` and `commands/add-notes.md`. No other repository or container was migrated, and this change was not published.
 
 ## Running the commands from a script
 
@@ -85,6 +119,7 @@ Live runs used a scratch project with the harness installed into its `.opencode`
   2. Install into it with `install.ps1 -Destination <scratch>\.opencode` or `install.sh --destination <scratch>/.opencode`.
   3. Confirm registration with `opencode api get "/api/command?location[directory]=<URL-encoded path>"` and the same query on `/api/agent`. Initial reads for new or reloaded locations have returned incomplete command/agent lists; subsequent reads after loading settled were complete. The container rollout also used `/api/location/reload` while no sessions were active.
   4. Run the changed commands through the API sequence above and compare each assistant message's model with the pin. For spec review, use both an overbuilt example and a right-sized example; check that it makes justified cuts, accepts appropriate scope, and includes the user-choice handoff. This calls paid models.
+     For document organization changes, cover new and legacy top-level discovery, ambiguity across both locations, archive/index exclusion, explicit missing paths, explicit archived reviews, selected legacy-plan revision, archived-plan follow-up into a new active plan, and denied edits outside active plan locations. Also exercise ordinary Superpowers spec and plan saving under the shared instructions, without an XM command.
   5. Preview and run the global installer, then repeat step 3 for a real project.
 
 ## Limits and open items

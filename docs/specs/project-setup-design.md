@@ -1,6 +1,6 @@
 # Project setup skill: design specification
 
-Design specification for `.opencode/skills/project-setup/`, updated 2026-11-10. Implemented in [`.opencode/skills/project-setup/SKILL.md`](../.opencode/skills/project-setup/SKILL.md) with the authoritative tool register in [`.opencode/skills/project-setup/references/preferred-devtools.md`](../.opencode/skills/project-setup/references/preferred-devtools.md).
+Design specification for `.opencode/skills/project-setup/`, updated 2026-11-12. Implemented in [`.opencode/skills/project-setup/SKILL.md`](../../.opencode/skills/project-setup/SKILL.md) with the authoritative tool register in [`.opencode/skills/project-setup/references/preferred-devtools.md`](../../.opencode/skills/project-setup/references/preferred-devtools.md).
 
 ## Intent
 
@@ -25,7 +25,7 @@ The skill must read `[references/preferred-devtools.md](references/preferred-dev
 
 ## Authoritative tools register
 
-See [`.opencode/skills/project-setup/references/preferred-devtools.md`](../.opencode/skills/project-setup/references/preferred-devtools.md) for the single maintained tool-selection table (OpenCode V2 + `opencode-defaults`, Superpowers, Context7, native OpenCode web search, optional Tavily, Chrome DevTools MCP, conditional Playwright, and `frontend-design` + Untitled UI React).
+See [`.opencode/skills/project-setup/references/preferred-devtools.md`](../../.opencode/skills/project-setup/references/preferred-devtools.md) for the single maintained tool-selection table (OpenCode V2 + `opencode-defaults`, Superpowers, Context7, native OpenCode web search, optional Tavily, Chrome DevTools MCP, conditional Playwright, and `frontend-design` + Untitled UI React).
 
 ## Browser-runtime boundary
 
@@ -92,7 +92,7 @@ Portable skill content excludes workstation-specific paths, personal global conf
 4. **Ensure the runtime.** Verify OpenCode V2 in the execution environment. When missing, use current official guidance and that environment's management conventions to bootstrap it. Load the `opencode` skill for OpenCode-specific setup. Installing the executable is separate from applying this repository's defaults.
 5. **Apply or reuse the base.** Resolve the install destination using the existing installer rules. Reuse an already-current installation; otherwise preview and apply the platform installer. Preserve local additions through its merge/backup behavior. Reconcile an existing `opencode.jsonc` conflict rather than bypassing the installer's refusal. OpenCode resolves declared plugin packages separately.
 6. **Configure project-owned tools.** Use the existing dependency system and configuration conventions. Place project-specific MCP/plugin declarations in the project's OpenCode configuration, reusing compatible inherited integrations. Avoid duplicate declarations or competing configuration files. Invoke `frontend-design` when visual work begins.
-7. **Verify and document.** Check tools in the actual execution environment. Record selected tools, verified connections and a fast local check in the new repo's instructions. Distinguish missing accounts, unavailable components and unmet infrastructure provisioning from completed setup.
+7. **Verify and document.** Check tools in the actual execution environment. Record selected tools, verified connections and a fast local check in the new repo's instructions. Unless repository instructions specify another arrangement, adopt the [`naming-files`](../../.opencode/skills/naming-files/SKILL.md) convention: maintained specs in `docs/specs/`, active plans in `docs/plans/`, and completed plans in `docs/plans/archive/`. Keep existing project documents and tool-managed `.superpowers/sdd/` state in place unless migration is requested. Distinguish missing accounts, unavailable components and unmet infrastructure provisioning from completed setup.
 
 Repeated setup must converge on the same effective configuration without duplicate dependencies or instruction sections. Existing projects retain their stack and design system. The existing installer may create backups on repeated application; idempotence concerns effective configuration, not zero writes.
 

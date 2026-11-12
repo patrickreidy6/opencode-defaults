@@ -1,5 +1,7 @@
 # Baseline Installation and Verification Implementation Plan
 
+**Archive note (2026-11-12):** Moved from `docs/superpowers/plans/2026-11-11-baseline-verification.md` after completion. Historical task commands and review hashes below are preserved; their old document paths are mapped in the [documentation index](../../README.md#document-migration-2026-11-12).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Give every OpenCode defaults installation a portable content fingerprint, an installation receipt, safe retirement of content the baseline drops, and a read-only `--check` that shows whether an installation holds a selected baseline.
@@ -8,9 +10,9 @@
 
 **Tech Stack:** Python 3.10+ standard library (`hashlib`, `json`, `argparse`, `subprocess`, `shutil`, `dataclasses`), `unittest`, Windows PowerShell 5.1, POSIX `sh`.
 
-**Spec:** [docs/baseline-verification-design.md](../../baseline-verification-design.md), plus the five amendments below. Task 1 writes them into the spec.
+**Spec:** [docs/specs/baseline-verification-design.md](../../specs/baseline-verification-design.md), plus the five amendments below. Task 1 writes them into the spec.
 
-**Status:** Approved plan implemented; Windows/Linux acceptance completed on 2026-11-11. The steps below preserve the implementation plan, not an execution log. Actual acceptance and final-review regression results are recorded in [the design's Verified section](../../baseline-verification-design.md#verified).
+**Status:** Complete and archived. Approved plan implemented; Windows/Linux acceptance completed on 2026-11-11. The steps below preserve the implementation plan, not an execution log. Actual acceptance and final-review regression results are recorded in [the design's Verified section](../../specs/baseline-verification-design.md#verified).
 
 ## Review reconciliation
 

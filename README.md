@@ -2,6 +2,8 @@
 
 Lean, cross-platform OpenCode V2 base defaults for Windows PCs, Linux hosts (`amd-halo`), and Docker workspace containers (`ops-infra`).
 
+See the [documentation index](docs/README.md) for maintained specs, completed plans and their original approval sources.
+
 ## What Is Included
 
 | Source | Installed location / purpose |
@@ -15,7 +17,7 @@ Lean, cross-platform OpenCode V2 base defaults for Windows PCs, Linux hosts (`am
 | `.opencode/skills/data-preferences/` | Analytical data defaults: local/NAS first, Google Cloud / Google Drive when cloud storage is needed, raw CSV + Parquet + Polars + DuckDB |
 | `.opencode/skills/project-setup/` | New-repository bootstrapping & `opencode-defaults` adoption + `references/preferred-devtools.md` conditional tool register |
 | `.opencode/skills/skill-authoring/` | [Agent Skills](https://agentskills.io/home) progressive-disclosure spec, OpenCode V2 layout, and `skills-ref` validation |
-| `.opencode/skills/naming-files/` | Concise lowercase hyphenated file and date-prefix naming rules |
+| `.opencode/skills/naming-files/` | File naming plus shared spec, plan and archive conventions |
 | `.opencode/skills/naming-directories/` | Concise lowercase hyphenated directory, hierarchy, and `.tmp` naming rules |
 | `.opencode/skills/socratic-tutor/` | Opt-in Socratic tutoring loop ("teach/tutor/quiz/drill me") adapted from Jane Street's `agent_skills` |
 
@@ -157,32 +159,33 @@ Use the OpenAI provider connected to the account that holds your API credits. Mo
 
 ## Opt-In Cross-Model Workflow
 
-Use this for foundational specs and new codebases where extra independent review is worthwhile. Invoke the commands explicitly in the OpenCode TUI; normal Plan and Superpowers sessions use the ordinary workflow. Design decisions, verified behavior, scripted invocation and maintenance steps are in [`docs/cross-model-workflow-design.md`](docs/cross-model-workflow-design.md).
+Use this for foundational specs and new codebases where extra independent review is worthwhile. Invoke the commands explicitly in the OpenCode TUI; normal Plan and Superpowers sessions use the ordinary workflow. Maintained artifacts from each workflow use the locations in [`naming-files`](.opencode/skills/naming-files/SKILL.md): maintained specs at `docs/specs/<topic>-design.md`, active plans at `docs/plans/YYYY-MM-DD-<topic>.md` (creation date), and completed plans at `docs/plans/archive/`. Repository instructions may specify another arrangement. The built-in Plan agent's write restriction still applies; use Build to persist its selected draft at the repository path before implementation. Design decisions, verified behavior, scripted invocation and maintenance steps are in [`docs/specs/cross-model-workflow-design.md`](docs/specs/cross-model-workflow-design.md).
 
 | Command | Model | Behavior |
 |---|---|---|
 | `/xm-spec-review <spec-path>` | GPT-6 Astra `xhigh` | Fresh reviewer judges scope and value, protects the core payoff, and recommends what to remove, shrink or defer |
-| `/xm-plan-write <spec-path>` | Claude Opus 5.5 `xhigh` | Current session writes a focused plan with clear task outcomes, shared contracts and checks, preserving the approved scope |
+| `/xm-plan-write <spec-or-plan-path>` | Claude Fable 5.2 `high` | Current session writes or revises a focused plan with clear task outcomes, shared contracts and checks, preserving the approved scope |
 | `/xm-plan-review <plan-path>` | Gemini 4 Carbon `high` | Fresh reviewer checks technical feasibility, spec coverage, interfaces and tests |
 | `/xm-plan-simplify <plan-path>` | GPT-6 Astra `xhigh` | Fresh reviewer proposes justified reductions in scope and complexity |
 | `/xm-code-review <plan-or-spec-path> [base-ref]` | Claude Fable 5.2 `high` | Fresh reviewer checks the branch and local changes against the requirements |
 
 ### Typical sequence
 
-1. Select `anthropic/claude-fable-5-2#high` using `/models` and brainstorm the feature with Superpowers. Save its design under `docs/superpowers/specs/`.
+1. Select `anthropic/claude-fable-5-2#high` using `/models` and brainstorm the feature with Superpowers. Save its maintained design at `docs/specs/<topic>-design.md`.
 2. Run `/xm-spec-review <exact-spec-path>`. The authoring session presents the recommendations and waits for you to choose which scope changes to accept before editing the spec.
-3. Run `/xm-plan-write <exact-spec-path>` instead of replying "approved" to brainstorming (which would continue into planning on Fable). The command approves the spec for planning, not implementation. It loads `writing-plans` and saves the implementation plan under `docs/superpowers/plans/`.
+3. Run `/xm-plan-write <exact-spec-path>` instead of replying "approved" to brainstorming (which would continue into the ordinary Superpowers planning workflow). The command approves the spec for planning, not implementation. It loads `writing-plans` and saves the implementation plan at `docs/plans/YYYY-MM-DD-<topic>.md`, with a spec link and clear status. Revise an already selected active plan in place. The planner returns the exact saved path and ready-to-use optional review commands.
 4. For both perspectives, submit `/xm-plan-review <exact-plan-path>` and `/xm-plan-simplify <exact-plan-path>` against the same unchanged plan and spec. Both run in background child sessions and include plan/spec content hashes in their reports. When both are requested, wait for **both**, confirm their paths and hashes match, then reconcile them in one revision. If either input changed, rerun the stale review against the current draft first. Each report carries this hold instruction for the parent session. Reviews are opt-in; requesting only one does not require waiting for its companion.
 5. Approve the revised plan. Start a fresh Build session, select `openai/gpt-6-astra#high`, and ask it to execute the plan using `subagent-driven-development`, giving it the plan and spec paths. Unoverridden `general` workers also use Astra `high`.
 6. Before merging, run `/xm-code-review <exact-plan-path> <base-ref-or-SHA>`. The reviewer inspects committed, staged, unstaged and relevant untracked changes. Give an explicit starting SHA when working directly on main/master; the command will not interpret an empty branch comparison as approval. Resolve findings in the implementation session.
+7. After implementation and verification, the Build session marks the plan complete, moves it to `docs/plans/archive/` with the same filename, and repairs links. Maintained specs stay in `docs/specs/`; `.superpowers/sdd/` remains tool-managed execution state.
 
-Use explicit paths, especially when several specs/plans are active. Quote paths containing spaces. An omitted path uses the relevant Superpowers directory only when it contains exactly one candidate; otherwise the command stops with candidate paths and requests an explicit selection. The in-session planner may also use a spec already explicitly selected in the conversation.
+Use explicit paths, especially when several specs/plans are active. Quote paths containing spaces. For omitted paths, spec commands inspect top-level Markdown documents in both `docs/specs/` and legacy `docs/superpowers/specs/`; plan reviews inspect `docs/plans/` and legacy `docs/superpowers/plans/`; code review inspects all four. Exclude archives, nested documents and indexes such as `README.md` and `index.md`. Select only when exactly one eligible document remains across the relevant directories; otherwise list candidates and request an explicit path. The in-session planner may also use a spec already explicitly selected in the conversation. An explicit missing path fails without substitution. Reviews accept explicit archived paths. `/xm-plan-write` also accepts an explicit active or archived plan: it resolves that plan's governing spec, revises a selected active plan, or creates a new active follow-up plan from an archive. If the governing spec cannot be resolved, it requests the exact spec path instead of inventing a spec or approval.
 
 The four review commands use `xm-reviewer`, a child-only agent with file edits and delegation denied and shell access limited to Git inspection. Reviews return findings to the parent rather than editing artifacts. They cannot run the test suite: provide test evidence or run the requested checks in Build. For spec reviews, you choose the scope changes before the author revises; for other reviews, the author reconciles feedback and you approve the result.
 
 `xm-spec-review` gives an opinion on whether the proposed build is worthwhile and appropriately sized, with a bias toward justified reductions. It reads the spec and relevant code/docs without requiring Git metadata. Its report identifies what to protect, what to cut and any essential gaps, then recommends a build boundary. It checks completeness where omissions threaten the intended outcome; technical plan coverage is checked by `/xm-plan-review`.
 
-`xm-plan-write` uses `xm-planner`, a primary agent that can edit only `docs/superpowers/plans/*.md`; shell commands and delegation are disabled. This allows repository plan writing that the built-in Plan agent would block. Run it from the repository root. For another plan directory, add a project-local `agents.xm-planner.permissions` edit rule for that path. The command pins Opus for its invocation; check the session model before later revision turns and reselect Opus if needed. The session remains in `xm-planner`; switch back to Build before editing a spec, committing, or implementing.
+`xm-plan-write` uses `xm-planner`, a primary agent with edit permissions for `docs/plans/*.md` and legacy `docs/superpowers/plans/*.md`; explicit archive denies follow both allow rules. OpenCode wildcards also match subdirectories, so the later archive denies are necessary ([permission matching](https://opencode.ai/docs/permissions#matching)). New plans go in `docs/plans/`; an explicitly selected legacy active plan can be revised in place. Shell commands and delegation are disabled. Run it from the repository root. For a repository-defined alternative, add a project-local `agents.xm-planner.permissions` edit rule for that path and a later deny for its archive. The command pins Fable 5.2 `high` for its invocation; check the session model before later revision turns and reselect Fable 5.2 `high` if needed. The session remains in `xm-planner`; switch back to Build before editing a spec, archiving, committing, or implementing.
 
 The planner preserves approved exclusions and deferrals, justifies consequential implementation additions, and leaves routine coding choices to Astra. It uses the `writing-plans` structure with explicit overrides for proportional detail, no fixed review-case quota and the cross-model handoff. Verification commands in a plan are proposed checks, not executed test evidence.
 
@@ -200,7 +203,7 @@ Example prompt to bootstrap a project with your conditional tooling preferences:
 Set up a new repo to build a website using opencode-defaults to define the base OpenCode harness installation.
 ```
 
-`project-setup` reuses or installs the shared base, evaluates [`preferred-devtools.md`](.opencode/skills/project-setup/references/preferred-devtools.md) against the project's actual needs (rather than installing every listed tool indiscriminately), and reports selection, config, runtime connection, and account sign-in separately. See [`docs/project-setup-design.md`](docs/project-setup-design.md) for the design specification and Halo/Docker browser boundary.
+`project-setup` reuses or installs the shared base, evaluates [`preferred-devtools.md`](.opencode/skills/project-setup/references/preferred-devtools.md) against the project's actual needs (rather than installing every listed tool indiscriminately), and reports selection, config, runtime connection, and account sign-in separately. It adopts the shared spec/plan convention unless repository instructions specify another arrangement, preserving existing documents in other repositories. See [`docs/specs/project-setup-design.md`](docs/specs/project-setup-design.md) for the design specification and Halo/Docker browser boundary.
 
 When starting a new repo (for example, a website repo `xyz` that needs extra MCP servers `abc` and `def`), declare **only** the project-specific additions in `xyz/opencode.json`:
 
@@ -250,7 +253,7 @@ Run the installer unit tests:
 uv run --no-project python -m unittest discover -s tests -v
 ```
 
-After changing `global/commands/` or the `xm-*` agents, also run the [live command check](docs/cross-model-workflow-design.md#changing-models-prompts-or-permissions). It calls paid models, so it is not part of the unit tests.
+After changing `global/commands/` or the `xm-*` agents, also run the [live command check](docs/specs/cross-model-workflow-design.md#changing-models-prompts-or-permissions). It calls paid models, so it is not part of the unit tests.
 
 Validate each skill against the [Agent Skills specification](https://agentskills.io/specification):
 ```sh

@@ -8,10 +8,13 @@ model: openai/gpt-6-astra#xhigh
 Review this implementation plan for unnecessary complexity: $ARGUMENTS
 
 You are a fresh, independent reviewer. Use the supplied path, treating a quoted
-path with spaces as one path. If omitted, select and name a Markdown plan in
-`docs/superpowers/plans/` only if exactly one candidate exists. If none or multiple
-exist, return BLOCKED with candidate paths and request an explicit
-path. Never substitute for a missing explicit path.
+path with spaces as one path. Explicit paths may include archived plans. If
+omitted, inspect top-level Markdown plans in both `docs/plans/` and legacy
+`docs/superpowers/plans/`; do not recurse, and exclude archives and indexes such
+as `README.md` and `index.md`. Select and name a file only if exactly one eligible
+candidate exists across both directories. If none or multiple exist, return
+BLOCKED with candidate paths and request an explicit path. Never substitute for
+a missing explicit path.
 
 Read the whole plan, its linked spec, applicable repository instructions and the
 relevant existing code/docs. Missing spec means you cannot judge which scope is

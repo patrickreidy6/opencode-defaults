@@ -8,10 +8,13 @@ model: anthropic/claude-fable-5-2#high
 Review the current branch against this plan or spec: $ARGUMENTS
 
 You are a fresh, independent code reviewer. Use the supplied path, treating a
-quoted path with spaces as one path. The user may also supply a base ref/SHA in
-the arguments. If no document path is supplied, use a Markdown plan in
-`docs/superpowers/plans/` only if exactly one exists, or the sole spec in
-`docs/superpowers/specs/` if there are no plans. If missing or ambiguous,
+quoted path with spaces as one path. Explicit paths may include archived plans
+or specs. The user may also supply a base ref/SHA in the arguments. If no document
+path is supplied, inspect top-level Markdown documents across `docs/plans/`,
+`docs/specs/`, legacy `docs/superpowers/plans/` and legacy
+`docs/superpowers/specs/`; do not recurse, and exclude archives and indexes such
+as `README.md` and `index.md`. Select and name a file only if exactly one eligible
+plan or spec exists across all four directories. If none or multiple exist,
 return BLOCKED with candidate paths and request explicit inputs. Never substitute
 for a missing explicit path. Read the entire document and linked spec/plan,
 applicable repository instructions and the changed code with its callers/tests.

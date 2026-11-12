@@ -14,10 +14,13 @@
     "xm-planner": {
       "description": "Write repository implementation plans for the opt-in /xm-plan-write command",
       "mode": "primary",
-      "model": "anthropic/claude-opus-5-5#xhigh",
+      "model": "anthropic/claude-fable-5-2#high",
       "permissions": [
         { "action": "edit", "resource": "*", "effect": "deny" },
+        { "action": "edit", "resource": "docs/plans/*.md", "effect": "allow" },
         { "action": "edit", "resource": "docs/superpowers/plans/*.md", "effect": "allow" },
+        { "action": "edit", "resource": "docs/plans/archive/*", "effect": "deny" },
+        { "action": "edit", "resource": "docs/superpowers/plans/archive/*", "effect": "deny" },
         { "action": "shell", "resource": "*", "effect": "deny" },
         { "action": "subagent", "resource": "*", "effect": "deny" },
         { "action": "experimental_image_generate", "resource": "*", "effect": "deny" }

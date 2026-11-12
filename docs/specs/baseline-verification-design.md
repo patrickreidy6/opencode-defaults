@@ -1,6 +1,6 @@
 # Baseline installation and verification
 
-**Workflow update, 2026-11-12:** this records the original offline baseline verifier and its historical acceptance. The current user workflow is [install once, inspect drift, receive updates](../README.md#periodic-drift-and-update). The repo is public; central archive delivery and identical workspace/`Local none` expectations are superseded. Updates explicitly reset shared items with backups while retaining workspace-only and project additions. The receipt/fingerprint and offline check remain useful implementation components.
+**Workflow update, 2026-11-12:** this records the original offline baseline verifier and its historical acceptance. The current user workflow is [install once, inspect drift, receive updates](../../README.md#periodic-drift-and-update). The repo is public; central archive delivery and identical workspace/`Local none` expectations are superseded. Updates explicitly reset shared items with backups while retaining workspace-only and project additions. The receipt/fingerprint and offline check remain useful implementation components. The [completed baseline plan](../plans/archive/2026-11-11-baseline-verification.md) and [later shared-harness plan](../plans/archive/2026-11-12-shared-harness-commands.md) retain their approval and execution records.
 
 Approved for planning 2026-11-11, with the review amendments recorded under Decisions.
 

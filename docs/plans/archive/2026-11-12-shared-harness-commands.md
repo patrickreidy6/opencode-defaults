@@ -1,5 +1,9 @@
 # Shared Harness Commands Implementation Plan
 
+**Status:** Complete and archived on 2026-11-12. Moved from `docs/superpowers/plans/2026-11-12-shared-harness-commands.md`.
+
+**Approval source:** The approved requirements are recorded in this plan's Contract and execution record, not a separate spec. The [baseline design](../../specs/baseline-verification-design.md) describes the earlier verifier and subsequent workflow change; it is related context, not a retrospective approval source.
+
 Implemented 2026-11-12: receive-only public-repository updates, behavior 2. Executed inline with one final review. The current checkout was used with the user's consent; concurrent model-workflow changes were kept separate.
 
 ## Contract

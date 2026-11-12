@@ -5,7 +5,7 @@ This repository maintains personal global OpenCode V2 defaults across Windows wo
 ## Source Layout
 - `global/opencode.json`: portable V2 defaults; Astra default/general/explore, Sol title, and `/xm-*` agent permissions. Merged into `~/.config/opencode/opencode.json` (or `$XDG_CONFIG_HOME/opencode/opencode.json`).
 - `baseline.json`: pinned OpenCode CLI version, also part of the baseline fingerprint.
-- `global/commands/*.md`: opt-in cross-model commands installed under global `commands/`; usage in README.md; design and live check in `docs/cross-model-workflow-design.md`.
+- `global/commands/*.md`: opt-in cross-model commands installed under global `commands/`; usage in README.md; design and live check in `docs/specs/cross-model-workflow-design.md`.
 - `global/AGENTS.md`: OS-neutral global rules installed as `AGENTS.md`. Machine-specific instructions belong in `~/.config/opencode/AGENTS.local.md` (loaded via `instructions` when present). This root file holds repository maintenance guidance.
 - `.opencode/skills/`: shared personal Agent Skills (`writer`, `frontend-design` + `references/ui-preferences.md`, `data-preferences`, `project-setup` + `references/preferred-devtools.md`, `skill-authoring`, `naming-files`, `naming-directories`, `socratic-tutor`), installed under global `skills/`.
 - `install.py` (`install.ps1` / `install.sh`): stdlib bootstrap, receipts, backups and offline verification; tested under `tests/`. `shared_harness.py` powers receive-only `/shared-harness-drift` and `/shared-harness-update` using a clean public-main cache at `~/.local/share/opencode-defaults`.

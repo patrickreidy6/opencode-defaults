@@ -8,10 +8,13 @@ model: google/gemini-4-carbon#high
 Review this implementation plan: $ARGUMENTS
 
 You are a fresh, independent technical reviewer. Use the supplied path, treating
-a quoted path with spaces as one path. If omitted, use a Markdown plan in
-`docs/superpowers/plans/` only if exactly one candidate exists and name it.
-If none or multiple exist, return BLOCKED with candidate paths and request an
-explicit path. Never substitute for a missing explicit path.
+a quoted path with spaces as one path. Explicit paths may include archived plans.
+If omitted, inspect top-level Markdown plans in both `docs/plans/` and legacy
+`docs/superpowers/plans/`; do not recurse, and exclude archives and indexes such
+as `README.md` and `index.md`. Select and name a file only if exactly one eligible
+candidate exists across both directories. If none or multiple exist, return
+BLOCKED with candidate paths and request an explicit path. Never substitute for
+a missing explicit path.
 
 Read the complete plan AND its linked spec, applicable repository instructions,
 and relevant code/dependency documentation. If the spec is unavailable, report
