@@ -6,6 +6,8 @@ Design record for the opt-in `/xm-*` commands, verified 2026-11-11 on OpenCode 2
 
 Add review by a different model vendor at each stage of spec-driven work, for the few projects where the extra cost is justified: foundational specs and new codebases. Ordinary Plan and Superpowers sessions remain the default and are unaffected unless a command is typed.
 
+The scope-focused refinements address Patrick's reported experience of Anthropic/Superpowers sessions asking too many questions and expanding secondary features and data fields. Astra should judge whether the build has reached a worthwhile scope for its subject matter, with a bias toward justified cuts that preserve the core payoff. Planning should preserve that balance and resolve routine technical choices without another round of product-design questions.
+
 ## Decisions
 
 - **Commands carry the models.** Plan writing and each review are slash commands with a pinned model. Authoring and execution are ordinary sessions on a model selected with `/models`. Nothing chains the stages; the user starts each one.
@@ -59,6 +61,7 @@ Live runs used a scratch project with the harness installed into its `.opencode`
 - A live `/xm-plan-write` run used an approved category-total CLI spec, a selected existing plan stub, and earlier conversation context proposing a database, extra fields, a dashboard and provider plugins. Opus revised only the selected plan, kept the superseded additions excluded, and produced one cohesive implementation task with concrete behavioral checks and no full test implementations.
 - Every assistant message used `anthropic/claude-opus-5-5#xhigh`; the session remained in `xm-planner`. It made no shell, subagent or question calls, labelled verification commands as planned checks, and stopped with the optional review commands and a fresh Astra Build-session handoff.
 - Session `ses_e328361dfffehih0s32b20qR8G` cost about $0.92. All 11 installer tests and `git diff --check` passed. This checks the revised prompt in isolation; it does not compare reasoning effort levels.
+- **Surface installation pending at this session's closeout:** the repository contains the refined plan writer, but `~/.config/opencode/commands/xm-plan-write.md` still contains the earlier prompt. Install the revised source before expecting the new behavior from the global command. The container rollout recorded above covered `xm-spec-review` and its reviewer profile only.
 
 ## Running the commands from a script
 
@@ -86,6 +89,7 @@ Live runs used a scratch project with the harness installed into its `.opencode`
 
 ## Limits and open items
 
+- **Remaining preference reviews:** `xm-plan-review`, `xm-plan-simplify` and `xm-code-review`. This conversation refined the spec review and plan writer; the other three retain their initial prompts.
 - **Guardrails, not a sandbox.** No rule denies Code Mode (`execute`) or MCP tools for `xm-planner` or `xm-reviewer`, and the allowed Git patterns also match forms that write, such as `git diff --no-ext-diff --no-textconv --output=<file>` and `git symbolic-ref <name> <ref>`. Reviewer prompts require read-only inspection; plan and code reviews also explicitly forbid Git output writes and external helpers. The spec review directs the agent to file and documentation tools. Tightening the permission rules was not part of this work; decide on it before using the commands on a repository you do not trust.
 - **Not verified:** how the TUI behaves when the two background plan reviews report back at different times (the check used one parent session per command, through the API); a follow-up turn after `/xm-plan-write` (only the session's stored model was read); full command execution on Linux/Halo beyond the spec review installation and registration checks above; whether a `.env` read prompt inside a background reviewer reaches the user.
 - **Model picks are dated.** They reflect the models and prices available on 2026-11-11. Revisit them when a provider ships a new model or the billing arrangement changes.
