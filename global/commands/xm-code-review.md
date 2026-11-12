@@ -79,7 +79,12 @@ observations, and evaluation changes that could make apparent improvement easier
 Before reporting, challenge each candidate finding in a separate verification
 pass. Try to disprove it: inspect the actual caller/data path, guards, tests,
 documented intent, base revision and final combined state. Establish a reachable
-trigger and concrete consequence. Reject speculation, behavior already handled
+trigger and concrete consequence. Do not invent a narrower input contract or
+dismiss a supported boundary case merely because it seems unlikely. Compare
+old and new semantics: similar old code does not make a failure pre-existing if
+the change introduces a new obligation. Use evidenced workload assumptions to
+calibrate severity, not to erase a demonstrated contract violation.
+Reject speculation, behavior already handled
 elsewhere, intentional behavior within the approved contract, superseded bugs,
 and pre-existing defects the change neither worsens nor makes newly reachable.
 Deduplicate findings with the same root cause. Missing tests alone are not proof

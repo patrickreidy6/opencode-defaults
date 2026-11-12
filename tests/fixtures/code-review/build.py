@@ -128,8 +128,19 @@ CASES = [
         },
         "probe": "from api import summarize; print(summarize([2, 4, 6]))",
         "result": "4.0",
-        "expected_findings": [],
-        "false_positive_trap": "The public caller already rejects empty input; private helper division by zero is unreachable through the supported API.",
+        "extra_probes": [{
+            "id": "mean-intermediate-overflow",
+            "code": "from api import summarize; print(summarize([1e308, 1e308])); print(1e308 / 2 + 1e308 / 2)",
+            "result": "inf\n1e+308",
+        }],
+        "expected_findings": [{
+            "id": "mean-intermediate-overflow",
+            "severity": "Important",
+            "paths": ["metrics.py", "api.py"],
+            "scenario": "Two finite observations of 1e308 have a representable mean of 1e308, but summing before dividing overflows and summarize returns inf.",
+            "acceptable_severities": ["Minor", "Important"],
+        }],
+        "false_positive_trap": "The public caller already rejects empty input; private helper division by zero is unreachable through the supported API. The separate intermediate-overflow defect is valid: the input contract does not impose a smaller magnitude bound.",
     },
     {
         "category": "pre-existing-bug",
@@ -310,6 +321,10 @@ def build(destination: Path) -> Path:
             run(["git", "add", "."], directory)
         write_files(directory, case.get("working", {}))
         verification["final_probe"] = check_probe(directory, case["probe"], case["result"])
+        for probe in case.get("extra_probes", []):
+            verification.setdefault("extra_probes", {})[probe["id"]] = check_probe(
+                directory, probe["code"], probe["result"]
+            )
         tests = subprocess.run(
             [sys.executable, "-B", "-m", "unittest", "discover", "-v"],
             cwd=directory, text=True, encoding="utf-8", capture_output=True,

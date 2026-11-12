@@ -26,11 +26,11 @@ the command, Python version, and output of the real test run. An evaluator may
 provide those fields as test evidence without exposing the private probe or
 expected-finding fields.
 
-| Case | Behavior under evaluation | Expected material findings |
+| Case | Behavior under evaluation | Expected defects |
 |---|---|---|
 | 01 | Correct aggregation with repeated and empty inputs | None |
 | 02 | Intentionally excluded Unicode/normalization support | None |
-| 03 | Empty input handled by the public caller | None |
+| 03 | Empty input handled by the public caller; finite inputs can overflow an intermediate sum | One arithmetic-overflow defect; no empty-input finding |
 | 04 | Existing boundary bug unaffected by a receipt-format change | None against this change |
 | 05 | Committed and staged defects fixed in the final working tree, using an untracked helper | None |
 | 06 | Catalog changes cents to dollars while payment code still expects cents | One unit-conversion regression |
@@ -41,6 +41,16 @@ base becoming 7 in the final state; case 04 confirms its boundary defect is
 already present in the base. Case 05 confirms that HEAD returns 1480 while the
 final tree correctly returns 1200. This distinguishes observed behavior from an
 evaluator's assumption about the code.
+
+Live evaluation also identified a legitimate numeric defect in case 03:
+`summarize([1e308, 1e308])` returns infinity even though its mathematical mean,
+`1e308`, is representable. The input contract permits these finite values. A
+private probe verifies that result and the representable mean computed by
+dividing before summing. Accept Minor or Important severity for this finding.
+The original empty-input check still tests false-positive filtering; rejecting
+that false alarm must not suppress the distinct overflow defect. Only private
+expectations and probes changed after this discovery: the model-visible source,
+tests, requirements, commit dates, and case names remain unchanged.
 
 For each prompt, build a separate fixture set and use fresh reviewer sessions
 with the same model, effort and permissions. Install the respective command in
@@ -63,3 +73,10 @@ Retain both raw reports and the adjudication. Check that reviewer sessions left
 the repositories unchanged. Neither keyword matching nor successful installation
 establishes review quality; rerun selected cases after material prompt or model
 changes, and add cases from real misses or false alarms.
+
+The [2026-11-12 evaluation results](results-2026-11-12.json) retain the original,
+first-revision and final-refinement prompts, raw reports, session IDs, timings,
+costs and adjudications. The [design record](../../../docs/specs/cross-model-workflow-design.md#code-review-verification-and-scope)
+explains the observed false rejections, numerical-boundary refinement and scoped
+Surface installation. These results are evaluator material; never copy them
+into a repository being reviewed.
