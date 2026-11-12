@@ -1,6 +1,6 @@
 # Cross-model commands implementation plan
 
-**Status:** Complete and archived on 2026-11-12. Moved from `.superpowers/sdd/cross-model-commands/plan.md`; related tool-managed execution state remains in its original location.
+**Status:** Complete and archived on 2026-11-12. Moved from `.superpowers/sdd/cross-model-commands/plan.md`; related tool-managed execution state was subsequently removed from the repository at the user's request, as recorded in the [document index](../../README.md#document-migration-2026-11-12).
 
 **Approval provenance:** The conversation cited below approved the initial implementation. The [maintained design record](../../specs/cross-model-workflow-design.md) describes the workflow and later changes; it does not replace that original approval. Model names below remain historical.
 

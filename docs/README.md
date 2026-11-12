@@ -26,7 +26,9 @@ Completion archives the plan, not its maintained spec. Archived plans retain his
 | `.superpowers/plans/pin-superpowers.md` | [docs/plans/archive/pin-superpowers.md](plans/archive/pin-superpowers.md) |
 | `.superpowers/sdd/cross-model-commands/plan.md` | [docs/plans/archive/cross-model-commands.md](plans/archive/cross-model-commands.md) |
 
-Navigational links now use the current paths. Historical task commands, source paths in those commands, review hashes and approval wording remain as recorded; use this mapping when interpreting them. The two `.superpowers` documents were previously ignored local files. Other ignored Superpowers logs and execution state remain in place as historical evidence, including any original path references. No other repository was migrated, and upstream Superpowers skills were not changed.
+Navigational links now use the current paths. Historical task commands, source paths in those commands, review hashes and approval wording remain as recorded; use this mapping when interpreting them. The two `.superpowers` documents were previously ignored local files. Other ignored Superpowers logs and execution state were retained during the migration. No other repository was migrated, and upstream Superpowers skills were not changed.
+
+The remaining local `.superpowers` directory was subsequently removed from this repository at the user's request on 2026-11-12 (sent to the Recycle Bin). Its old run history does not configure save locations. The `.superpowers/` ignore rule remains, and Superpowers can recreate execution state there as needed; the shared spec and plan locations are unchanged.
 
 Migration checks, live fixtures and the local installation are recorded in the [verification results](specs/cross-model-workflow-design.md#document-organization-and-surface-rollout-2026-11-12).
 
