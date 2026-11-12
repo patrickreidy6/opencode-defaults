@@ -182,6 +182,7 @@ class InstallHarnessTests(unittest.TestCase):
             commands = repo / "global" / "commands"
             commands.mkdir(parents=True)
             shutil.copy2(INSTALL_PY, repo / "install.py")
+            (repo / "baseline.json").write_bytes(b'{"opencode": "2.2.7"}\n')
             (repo / "global" / "opencode.json").write_text("{}\n", encoding="utf-8")
             (repo / "global" / "AGENTS.md").write_text("# Test defaults\n", encoding="utf-8")
             payloads = {

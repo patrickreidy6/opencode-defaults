@@ -1,3 +1,3 @@
-# Normalize text files and enforce LF on shell scripts for Linux/Docker portability
-* text=auto
+# LF keeps the fingerprint identical across checkouts and archives.
+* text=auto eol=lf
 *.sh text eol=lf

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import json
 import os
 import re
@@ -14,6 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+BASELINE_FILE = "baseline.json"
 SKIP_PARTS = {"__pycache__", "node_modules", ".venv", ".git"}
 SKIP_SUFFIXES = {".pyc", ".pyo", ".pyd"}
 PR4_AGENTS_HEADER = "# Personal OpenCode Defaults"
@@ -31,6 +33,35 @@ RETIRED_PR4_FILES = (
     Path("preferences/DATA_PREFERENCES.md"),
     Path("guides/skill-authoring.md"),
 )
+
+
+class BaselineError(Exception):
+    """The source baseline is missing, unreadable or invalid."""
+
+
+def load_baseline(repo_root: Path) -> str:
+    def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result = dict(pairs)
+        if len(result) != len(pairs):
+            raise BaselineError(f"{BASELINE_FILE}: duplicate keys are not allowed")
+        return result
+
+    try:
+        text = (repo_root / BASELINE_FILE).read_text(encoding="utf-8")
+        baseline = json.loads(text, object_pairs_hook=unique_object)
+    except OSError as exc:
+        raise BaselineError(f"{BASELINE_FILE}: {exc.strerror or 'unable to read file'}") from None
+    except UnicodeDecodeError:
+        raise BaselineError(f"{BASELINE_FILE}: invalid UTF-8") from None
+    except json.JSONDecodeError as exc:
+        raise BaselineError(f"{BASELINE_FILE}: invalid JSON ({exc.msg})") from None
+
+    if not isinstance(baseline, dict) or set(baseline) != {"opencode"}:
+        raise BaselineError(f"{BASELINE_FILE}: expected an object with only the opencode key")
+    version = baseline["opencode"]
+    if not isinstance(version, str) or not version.strip():
+        raise BaselineError(f"{BASELINE_FILE}: opencode must be a nonempty version string")
+    return version.strip()
 
 
 def default_destination() -> Path:
@@ -120,6 +151,25 @@ def collect_files(repo_root: Path) -> list[tuple[Path, Path]]:
     return files
 
 
+def sha256_file(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def managed_files(repo_root: Path) -> dict[str, Path]:
+    return {rel.as_posix(): source for source, rel in collect_files(repo_root)}
+
+
+def fingerprint_inputs(repo_root: Path) -> list[tuple[str, Path]]:
+    sources = [source for source, _ in collect_files(repo_root)]
+    sources.extend((repo_root / "global" / "opencode.json", repo_root / BASELINE_FILE))
+    return sorted((source.relative_to(repo_root).as_posix(), source) for source in sources)
+
+
+def compute_fingerprint(repo_root: Path) -> str:
+    manifest = "".join(f"{sha256_file(path)}  {rel}\n" for rel, path in fingerprint_inputs(repo_root))
+    return hashlib.sha256(manifest.encode("utf-8")).hexdigest()
+
+
 def backup_file(target: Path, rel_path: Path, backup_root: Path) -> None:
     if target.is_file():
         backup_target = backup_root / rel_path
@@ -167,9 +217,28 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Preview changes without modifying the filesystem.",
     )
+    parser.add_argument(
+        "--fingerprint",
+        action="store_true",
+        help="Print the portable source-content fingerprint without installing.",
+    )
     args = parser.parse_args(argv)
+    if args.fingerprint and (args.dry_run or args.destination is not None):
+        parser.error("--fingerprint cannot be combined with --dry-run or --destination")
 
     repo_root = Path(__file__).resolve().parent
+    try:
+        load_baseline(repo_root)
+        if args.fingerprint:
+            print(compute_fingerprint(repo_root))
+            return 0
+    except BaselineError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+    except OSError as exc:
+        print(f"Error: {exc.filename}: {exc.strerror or 'unable to read source file'}", file=sys.stderr)
+        return 1
+
     destination = args.destination.expanduser().resolve() if args.destination else default_destination()
 
     jsonc_path = destination / "opencode.jsonc"
