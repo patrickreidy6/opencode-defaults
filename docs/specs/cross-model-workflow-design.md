@@ -26,6 +26,37 @@ The scope-focused refinements address Patrick's reported experience of Anthropic
 - **High-volume work stays on OpenAI.** OpenAI usage draws on prepaid credits; Anthropic and Google are billed per call. Execution, `general` workers, `explore` and `title` run on OpenAI models, and Anthropic and Google handle the low-volume authoring and review stages.
 - **An omitted path is never guessed.** Discover only top-level Markdown documents in the applicable new and legacy directories, excluding archives, nested documents, `README.md`, `index.md` and other indexes. Spec commands inspect both `docs/specs/` and `docs/superpowers/specs/`; plan reviews inspect both `docs/plans/` and `docs/superpowers/plans/`; code review inspects all four. Proceed only when exactly one eligible candidate exists across those directories; otherwise list candidates and require an explicit path. The in-session planner retains its ability to use a spec explicitly selected in the conversation. Explicit missing paths fail without substitution.
 
+## Model allocation review, 2026-11-13
+
+**Status:** review findings retained; no model, prompt or installed-default changes. The financial-spec authoring trial below is a recommendation, not an adopted workflow or a completed evaluation.
+
+The review recommended retaining all five command assignments and Astra for implementation. Carbon already provides technical financial/simulation review; Astra handles execution and scope control; Fable provides planning and independent code review. An accounting leaderboard does not rank all of those capabilities.
+
+### Evidence and limits
+
+- [DualEntry's accounting benchmark](https://www.dualentry.com/benchmark), inspected on 2026-11-13, placed Argon first overall and Carbon first on its hard subset. Its 101 synthetic accounting cases motivate a financial-domain trial, not a claim of superiority at simulation engineering. The supplied summary emphasized Opus 5.5, while this workflow uses Fable 5.2; neither those Opus comparisons nor the inspected leaderboard established Fable as a close second overall.
+- [Epoch's Astra mathematics results](https://epoch.ai/models/gpt-6-astra) support retaining Astra for simulator mechanics, but do not validate financial assumptions, causal timing or participant isolation. Existing local review fixtures likewise demonstrate specific behaviors, not a general model ranking.
+
+### Proposed financial-spec authoring trial
+
+The potential gap is early financial-domain scrutiny: Carbon currently enters after spec approval. Compare Carbon `high` with Fable `high` on the same representative financial specification and independently checked scenario. Judge financial errors, unsupported assumptions, unnecessary scope and human correction effort before changing the authoring default.
+
+If adopted for financial specifications, Carbon would lead authoring, followed by the existing Astra scope review and Fable plan writing. Fable should check the worked scenario and assumptions rather than merely translate them. General engineering specifications would continue to start with Fable. Difficult mathematical mechanisms may merit a focused Astra derivation checked by another model against the financial scenario. No additional mandatory review command is proposed.
+
+There is no task-specific evidence here to replace Carbon with Argon for technical plan review. Future replacements should use the [existing evaluation procedure](#changing-models-prompts-or-permissions). Selecting models to act as simulation participants is a separate evaluation from selecting models to build it. Subscription quotas and headline speed estimates do not establish the economics of the actual OpenCode provider route.
+
+## UI workflow applicability, 2026-11-13
+
+**Status:** review findings retained; current model assignments remain appropriate for important UI builds. No prompts, model assignments or installed defaults were changed by this review.
+
+Important UI builds fit the existing workflow. Establish a representative screen or prototype before detailed planning so the visual direction and interaction approach are concrete. The specification should cover visual direction, primary user journeys, interaction states, responsive behavior and accessibility requirements.
+
+Use the existing [`frontend-design` skill](../../.opencode/skills/frontend-design/SKILL.md) and inspect the rendered interface during implementation. Static code review cannot establish visual quality; rendered inspection is part of assessing whether the implementation delivers the intended experience.
+
+Generalizing the simplifier's institutional-finance operations persona remains a proposed refinement, not an implemented change. The current perspective is recorded under [reviewer perspectives and efficiency](#reviewer-perspectives-and-efficiency).
+
+Small visual adjustments usually do not warrant the full review sequence. Keep the review effort proportionate to the change.
+
 ## Reviewer perspectives and efficiency
 
 The reviewer refinements agreed on 2026-11-12 are implemented in the command source files. Each perspective guides judgment while remaining calibrated to the project's actual goals, scale and resources.
