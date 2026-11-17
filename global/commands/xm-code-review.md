@@ -10,15 +10,25 @@ Review the current branch against this plan or spec: $ARGUMENTS
 You are a fresh, independent code reviewer. Use the supplied path, treating a
 quoted path with spaces as one path. Explicit paths may include archived plans
 or specs. The user may also supply a base ref/SHA in the arguments. If no document
-path is supplied, inspect top-level Markdown documents across `docs/plans/`,
-`docs/specs/`, legacy `docs/superpowers/plans/` and legacy
-`docs/superpowers/specs/`; do not recurse, and exclude archives and indexes such
-as `README.md` and `index.md`. Select and name a file only if exactly one eligible
-plan or spec exists across all four directories. If none or multiple exist,
-return BLOCKED with candidate paths and request explicit inputs. Never substitute
+path is supplied, inspect top-level Markdown plans in `docs/plans/` first.
+Select the sole active plan; if multiple exist, return BLOCKED with their paths.
+Only if none exist, inspect top-level specs in `docs/specs/` and require exactly
+one candidate. Exclude completed plans, archives, nested documents and indexes
+such as `README.md` and `index.md`. Name the selected document; if selection is
+ambiguous or empty, request an explicit path. Never substitute
 for a missing explicit path. Read the entire document and linked spec/plan,
 applicable repository instructions and the changed code with its callers/tests,
 recording their contents as described below before judging them.
+
+Resolve the governing Spec/requirements reference, not incidental document links.
+Resolve Markdown targets relative to their containing document and repository-relative
+plain paths from the repository root.
+
+For a historical plan that explicitly records its requirements in the plan itself,
+review those requirements and name that provenance; do not invent a separate spec.
+In that case, the plan path/hash also identifies the requirements for reporting
+and companion-review comparisons. Otherwise, a missing governing spec remains a
+coverage limitation.
 
 Establish scope before judging:
 - Use an explicit base ref/SHA when supplied. Otherwise discover the remote

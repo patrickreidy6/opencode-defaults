@@ -1,6 +1,6 @@
 # Documentation
 
-Maintained specs live in `specs/`, active plans in `plans/`, and completed plans in `plans/archive/`. Ordinary, XM and Superpowers work share the [`naming-files` convention](../.opencode/skills/naming-files/SKILL.md). Repository instructions can specify a different arrangement. There are no active plans in this repository at this migration.
+Maintained specs live in `specs/`, active plans in `plans/`, and completed plans in `plans/archive/`. Ordinary, XM and Superpowers work share the [`naming-files` convention](../.opencode/skills/naming-files/SKILL.md). Repository instructions can specify a different arrangement.
 
 ## Specs and associated plans
 

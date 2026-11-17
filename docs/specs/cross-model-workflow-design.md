@@ -2,6 +2,18 @@
 
 Design record for the opt-in `/xm-*` commands, with dated verification below. Usage and the per-command model table are in the [README](../../README.md#opt-in-cross-model-workflow). Implemented in [`global/commands/`](../../global/commands/), the `xm-planner` and `xm-reviewer` agents in [`global/opencode.json`](../../global/opencode.json), and the command copy step in [`install.py`](../../install.py). The [completed initial plan](../plans/archive/cross-model-commands.md) records conversation approval; this maintained design is not a retrospective replacement for that approval source.
 
+## Document selection update, 2026-11-16
+
+Current command source searches only `docs/specs/` and `docs/plans/`, not legacy locations. Code review prefers a sole active plan before falling back to specs. Plan writing reuses a sole active plan linked to the selected spec and asks when multiple match. Governing Markdown links resolve relative to the document; plain repository-relative paths resolve from the repository root. Historical reviews may use requirements explicitly retained in the plan, with its path/hash identifying that authority. Explicit missing paths still fail, and archives are selected only explicitly. This prompt-only update leaves agent permissions unchanged and has not been installed or live-tested. Earlier rollout records below describe their dated behavior.
+
+### Verification and planner troubleshooting
+
+The small document-selection edits passed `git diff --check`; all five command frontmatter blocks retained their existing model/agent selections, and no legacy path references remained in the XM command files. This was static verification, not a live command test. The changes were left local and uncommitted; no installation or reload was performed for this update.
+
+Selecting **Xm-Planner** is not the same as invoking **`/xm-plan-write`**. The agent profile supplies permissions and a default model; the slash command supplies the planning prompt and explicit model selection. Typing "write the plan" or reading the command file does not invoke that selection. Use `/xm-plan-write <spec-or-plan-path>` for the configured workflow. Loading `writing-plans` is expected: the command explicitly uses that Superpowers skill with its own scope and handoff overrides.
+
+The 16 November interruption was traced to an OpenCode reload: the log recorded `opencode reload` at 15:58:30 EST, and three pending reads subsequently reported "Interaction cancelled because the location shut down." The agent's question about continuing was not a Superpowers permission gate. Choosing "Write directly here" continued the existing Xm-Planner/Gemini 4 Carbon session, which saved a draft plan. When this error appears during maintenance, check for a reload before treating it as a skill conflict; arrange deliberate reloads between active runs.
+
 ## Intent
 
 Add review by a different model vendor at each stage of spec-driven work, for the few projects where the extra cost is justified: foundational specs and new codebases. Ordinary Plan and Superpowers sessions remain the default; cross-model reviews run only when a command is typed. All workflows share the document convention below unless repository instructions specify otherwise.
@@ -25,6 +37,24 @@ The scope-focused refinements address Patrick's reported experience of Anthropic
 - **When both plan reviews are requested, they run on one unchanged draft.** Each reports the plan and spec content hashes and tells the parent to wait if its companion is running, so both are reconciled in one revision. A single requested review does not create a wait for an unrequested companion.
 - **High-volume work stays on OpenAI.** OpenAI usage draws on prepaid credits; Anthropic and Google are billed per call. Execution, `general` workers, `explore` and `title` run on OpenAI models, and Anthropic and Google handle the low-volume authoring and review stages.
 - **An omitted path is never guessed.** Discover only top-level Markdown documents in the applicable new and legacy directories, excluding archives, nested documents, `README.md`, `index.md` and other indexes. Spec commands inspect both `docs/specs/` and `docs/superpowers/specs/`; plan reviews inspect both `docs/plans/` and `docs/superpowers/plans/`; code review inspects all four. Proceed only when exactly one eligible candidate exists across those directories; otherwise list candidates and require an explicit path. The in-session planner retains its ability to use a spec explicitly selected in the conversation. Explicit missing paths fail without substitution.
+
+## Claude Agent migration, 2026-11-16
+
+**Superseded later the same day:** Patrick reported that Fable 5.2 appeared in the Claude Agent model list but was not accessible. At his request, spec authoring, `/xm-plan-write`, `/xm-code-review` and the `xm-planner` default were restored to `anthropic/claude-fable-5-2#high`, and the custom Claude Agent model registration was removed. Patrick will add Anthropic API credits. The earlier connection check below does not establish current model access.
+
+The Anthropic restoration was installed on the Surface and OpenCode was reloaded. The live agent API resolved `xm-planner` to provider `anthropic`, model `claude-fable-5-2`, variant `high`; both installed command files contain the same selection. Comparison with the pre-restoration installation verified that only the two command files, planner model and custom provider registration changed, with an updated installation receipt. Other installed prompts, permissions and provider assignments were preserved. The restoration backup is `~/.config/opencode/backups/harness-20261116-155818-819441/`.
+
+Restoration validation: 126 tests ran (116 passed, 10 platform-specific skips), and `git diff --check` passed. The scoped installation check passed for files, configuration and receipt, while reporting the existing CLI mismatch: installed 2.3.0 versus baseline 2.2.7. No Anthropic inference request was made; API access remains unverified pending credits. This was a local Surface deployment, with no commit, push or other-machine rollout.
+
+### Earlier migration record (superseded)
+
+The Claude provider changed from Anthropic API to Claude Agent for spec authoring, `/xm-plan-write`, `/xm-code-review` and the `xm-planner` default. Each retains Fable 5.2 at `high`; OpenAI and Google assignments and all command prompts and permissions are unchanged by this migration.
+
+Claude Code was installed with Anthropic's native Windows installer at `C:\Users\preid\.local\bin\claude.exe`; `claude --version` and command resolution verified the installation and PATH. Subscription sign-in completed with `claude auth login --claudeai`, and `claude auth status` confirmed a logged-in `claude.ai` account using the first-party provider. OpenCode was connected with `opencode auth login claude-agent`, the CLI equivalent of selecting Claude Agent in `/connect`. These are separate steps: installing Claude Code alone does not connect the subscription to OpenCode.
+
+On the Surface, OpenCode 2.3.0 and Claude Code 2.1.325 successfully completed a short request using `claude-agent/claude-fable-5-2#high`. The live model registry resolved the exact model ID through `aisdk:@opencode/claude-agent` with `high` effort, and the planner resolved to the same provider/model/variant. This checks the connection and selection, not the quality of a full planning or review run. The repository suite ran 126 tests (116 passed, 10 platform-specific skips), and `git diff --check` passed.
+
+The standard installer deployed a scoped snapshot preserving existing installed prompts, including repository refinements not yet installed. Only the two Claude command files, `opencode.json` and the installation receipt changed; unrelated configuration and installed files were verified unchanged. Backups are under `~/.config/opencode/backups/harness-20261116-153647-961155/`. The scoped installation check passed for files, config and receipt; it reported the pre-existing runtime mismatch (installed 2.3.0 versus repository baseline 2.2.7). No CLI downgrade, other-machine rollout or publication was performed.
 
 ## Model allocation review, 2026-11-13
 
@@ -221,7 +251,7 @@ The Surface rollout used the standard preview and installer, with backups under 
 ## Changing models, prompts or permissions
 
 - **Models.** A command's model is set in its `model:` line. The planner's also appears in `agents.xm-planner.model`. The README tables list all of them, and `tests/test_install.py` asserts the `title`, `explore` and `general` defaults. Confirm the variant exists for the new model.
-- **Reviewer Git commands.** The `xm-reviewer` allow rules match the whole command, so a command must begin with an allowed form. In the first live run these were denied: Git with global options (`git --no-optional-locks …`, `git -c …`), compound lines containing any other command, `Get-FileHash`, `git ls-files` and `python`. The plan and code review prompts name the allowed standalone forms; the spec review uses read-only file and documentation tools and requires no Git metadata. If a prompt needs another Git form, add the matching rule in `global/opencode.json`.
+- **Reviewer Git commands.** The `xm-reviewer` allow rules match the whole command, so a command must begin with an allowed form. In the first live run these were denied: Git with global options (`git --no-optional-locks Ã¢â‚¬Â¦`, `git -c Ã¢â‚¬Â¦`), compound lines containing any other command, `Get-FileHash`, `git ls-files` and `python`. The plan and code review prompts name the allowed standalone forms; the spec review uses read-only file and documentation tools and requires no Git metadata. If a prompt needs another Git form, add the matching rule in `global/opencode.json`.
 - **Removing or renaming a command.** The installation receipt removes an unchanged retired command on the next install, with a backup; locally changed retired commands are kept and named. No `install.py` change is needed for commands tracked by a receipt.
 - **Live check.** The unit tests cover delivery only. To check behavior without touching the global config:
   1. Create a scratch project with a small spec and plan. Run `git init` and commit before OpenCode first loads the directory. In the first run the planner described the fixture as a non-Git directory; the location had been queried before `git init`.

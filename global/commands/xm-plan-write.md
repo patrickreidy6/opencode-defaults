@@ -16,13 +16,16 @@ without substitution. Invoking this command approves the resolved selected spec
 for planning, not implementation; archived completion grants no new approval.
 If the path is omitted, prefer the spec most recently explicitly selected in
 this conversation. Otherwise
-inspect top-level Markdown specs in both `docs/specs/` and legacy
-`docs/superpowers/specs/`; do not recurse, and exclude archives and indexes such
+inspect top-level Markdown specs in `docs/specs/`; do not recurse. Exclude archives and indexes such
 as `README.md` and `index.md`. Select a file only if exactly one eligible candidate
-exists across both directories. Name the selected file before planning. If none
+exists. Name the selected file before planning. If none
 or multiple exist, list the candidate paths and ask for the exact path; do not
 guess. Never substitute for a missing explicit path, including one selected in
 the conversation.
+
+Resolve the governing Spec/requirements reference, not incidental document links.
+Resolve Markdown targets relative to their containing document and repository-relative
+plain paths from the repository root.
 
 Load `writing-plans` for its structure and coverage checks. The scope, detail and
 handoff instructions below take precedence over its generic template and workflow.
@@ -65,19 +68,19 @@ Write for a capable Astra executor starting in a fresh session:
 Load `naming-files` for the shared spec and plan convention. Save a new plan as
 `docs/plans/YYYY-MM-DD-<topic>.md`, using its creation date. Include a navigable link
 to the selected spec and a clear status, initially `Draft (awaiting review)`.
-Revise an explicitly selected existing active plan for this spec rather than
-creating a competing copy, including a legacy plan under `docs/superpowers/plans/`;
-retain its filename and creation date. If the selected plan is archived, preserve
-it and create a new active plan for the follow-up work, linking the archived plan
+Revise an explicitly selected active plan in place. Otherwise, check top-level
+plans in `docs/plans/` for a governing-spec reference resolving to the selected
+spec: revise the sole active match, ask which to use if multiple match, and
+create a plan only if none match. Exclude completed plans from this search.
+Retain an existing plan's filename and creation date. If the selected plan is
+archived, preserve it and create a new active plan for the follow-up work, linking the archived plan
 as provenance as well as the approved spec. Do not treat past completion as
 approval for new implementation.
 
-This agent may edit only Markdown plans in `docs/plans/` and legacy
-`docs/superpowers/plans/`, excluding their `archive/` directories. If project
-instructions require another destination, explain the restriction and request a
+This command may edit only Markdown plans in `docs/plans/`, excluding `archive/`.
+If project instructions require another destination, explain the restriction and request a
 project-local permission override; do not write elsewhere through another tool.
-Keep `.superpowers/sdd/` for tool-managed execution state, not maintained specs
-or plans. Shell commands and subagent delegation are disabled. Use read/glob/grep
+Shell commands and subagent delegation are disabled. Use read/glob/grep
 and documentation tools for research. Do not run tests, write implementation
 files, create worktrees or make commits.
 
