@@ -20,3 +20,5 @@ This repository maintains personal global OpenCode V2 defaults across Windows wo
 - Run `uv run --no-project python -m unittest discover -s tests -v` (or `python3 -m unittest discover -s tests -v`) and run install, then `--check`, against an isolated `--destination` after installer edits.
 - Validate changed skills with `uv run --no-project --with "git+https://github.com/agentskills/agentskills.git#subdirectory=skills-ref" python -m skills_ref.cli validate .opencode/skills/<name>`.
 - Never commit credentials, OAuth tokens, `.env` files, or install backups.
+
+Keep business-project briefs, research inventories and commercial planning in their owning private repositories, not this public defaults repository.
