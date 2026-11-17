@@ -2,6 +2,12 @@
 
 Design record for the opt-in `/xm-*` commands, with dated verification below. Usage and model-switching instructions are in the [README](../../README.md#opt-in-cross-model-workflow). Implemented in [`global/commands/`](../../global/commands/), the `xm-planner` and `xm-reviewer` agents in [`global/opencode.json`](../../global/opencode.json), and the command copy step in [`install.py`](../../install.py). The [completed initial plan](../plans/archive/cross-model-commands.md) records conversation approval; this maintained design is not a retrospective replacement for that approval source.
 
+## Model assignment verification, 2026-11-17
+
+In an isolated install, changing only `xm-plan-write` to `openai/gpt-6-astra#medium` updated both the installed command and the planner agent. All four review commands kept their assigned models.
+
+The Surface installation used the existing assignments. After reload, OpenCode listed all five commands. The installer verified the files, config and receipt. Its only drift finding was the installed CLI version (2.3.0 versus the 2.2.7 pin). The test suite passed with 116 tests passing and 10 skipped. Verification covered installation and registration. No paid model calls were made.
+
 ## Document selection update, 2026-11-16
 
 Current command source searches only `docs/specs/` and `docs/plans/`, not legacy locations. Code review prefers a sole active plan before falling back to specs. Plan writing reuses a sole active plan linked to the selected spec and asks when multiple match. Governing Markdown links resolve relative to the document; plain repository-relative paths resolve from the repository root. Historical reviews may use requirements explicitly retained in the plan, with its path/hash identifying that authority. Explicit missing paths still fail, and archives are selected only explicitly. This prompt-only update leaves agent permissions unchanged and has not been installed or live-tested. Earlier rollout records below describe their dated behavior.
