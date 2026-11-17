@@ -1,8 +1,8 @@
 ---
-description: Scope and complexity review with GPT-6 Astra (xhigh)
+description: Scope and complexity review
 agent: xm-reviewer
 subagent: true
-model: openai/gpt-6-astra#xhigh
+model: {{xm-model}}
 ---
 
 Review this implementation plan for unnecessary complexity: $ARGUMENTS

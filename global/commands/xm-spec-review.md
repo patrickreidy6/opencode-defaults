@@ -1,8 +1,8 @@
 ---
-description: Spec scope and value review with GPT-6 Astra (xhigh)
+description: Spec scope and value review
 agent: xm-reviewer
 subagent: true
-model: openai/gpt-6-astra#xhigh
+model: {{xm-model}}
 ---
 
 Review the scope and value of this design/spec: $ARGUMENTS

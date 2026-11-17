@@ -1,0 +1,7 @@
+{
+  "xm-code-review": "anthropic/claude-fable-5-2#high",
+  "xm-plan-review": "google/gemini-4-carbon#high",
+  "xm-plan-simplify": "openai/gpt-6-astra#xhigh",
+  "xm-plan-write": "anthropic/claude-fable-5-2#high",
+  "xm-spec-review": "openai/gpt-6-astra#xhigh"
+}

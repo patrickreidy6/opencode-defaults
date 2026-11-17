@@ -1,8 +1,8 @@
 ---
-description: Technical plan review with Gemini 4 Carbon (high)
+description: Technical plan review
 agent: xm-reviewer
 subagent: true
-model: google/gemini-4-carbon#high
+model: {{xm-model}}
 ---
 
 Review this implementation plan: $ARGUMENTS

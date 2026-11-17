@@ -224,8 +224,41 @@ def managed_files(repo_root: Path) -> dict[str, Path]:
     return {rel.as_posix(): source for source, rel in collect_files(repo_root)}
 
 
+def installed_file_hash(source: Path, rendered: bytes | None) -> str:
+    if rendered is None:
+        return sha256_file(source)
+    return hashlib.sha256(rendered).hexdigest()
+
+
+def resolve_xm_models(repo_root: Path, config: dict, files: dict[str, Path]) -> dict[str, bytes]:
+    """Resolve source templates before hashing, checking or installing them."""
+    commands = {path.stem: rel for rel, path in files.items() if rel.startswith("commands/xm-")}
+    path = repo_root / "global/xm-models.json"
+    planner = config.get("agents", {}).get("xm-planner", {})
+    if not path.exists() and planner.get("model") != "{{xm-plan-write-model}}":
+        return {}  # Older sources contain literal command models.
+    models = read_config(path)
+    if models.keys() != commands.keys():
+        raise InstallError(f"{path}: expected one model for each XM command: {', '.join(sorted(commands))}")
+    rendered = {}
+    for name, rel in commands.items():
+        model = models[name]
+        if not isinstance(model, str) or not re.fullmatch(r"[\w.-]+/[\w./:-]+(?:#[\w.-]+)?", model):
+            raise InstallError(f"{path}: invalid provider/model for {name}")
+        template = files[rel].read_bytes()
+        if template.count(b"model: {{xm-model}}") != 1:
+            raise InstallError(f"{files[rel]}: missing or repeated XM model placeholder")
+        rendered[rel] = template.replace(b"{{xm-model}}", model.encode())
+    if planner.get("model") == "{{xm-plan-write-model}}":
+        planner["model"] = models["xm-plan-write"]
+    return rendered
+
+
 def fingerprint_inputs(repo_root: Path) -> list[tuple[str, Path]]:
     sources = [source for source, _ in collect_files(repo_root)]
+    model_map = repo_root / "global/xm-models.json"
+    if model_map.exists():
+        sources.append(model_map)
     sources.extend((repo_root / "global" / "opencode.json", repo_root / BASELINE_FILE))
     return sorted((source.relative_to(repo_root).as_posix(), source) for source in sources)
 
@@ -519,10 +552,11 @@ def run_check(repo_root: Path, destination: Path, expect: str | None) -> int:
         active_path = repo_root / "global/opencode.json"
         baseline_cfg = read_config(active_path)
         files = managed_files(repo_root)
+        rendered = resolve_xm_models(repo_root, baseline_cfg, files)
         hashes = {}
         for rel, source in files.items():
             active_path = source
-            hashes[rel] = sha256_file(source)
+            hashes[rel] = installed_file_hash(source, rendered.get(rel))
         active_path = repo_root
         fingerprint = compute_fingerprint(repo_root)
         details["Baseline"] = [fingerprint]
@@ -652,10 +686,11 @@ def run_install(repo_root: Path, destination: Path, *, dry_run: bool, reset_shar
         active_path = repo_root / "global" / "opencode.json"
         incoming_cfg = read_config(active_path)
         files = managed_files(repo_root)
+        rendered = resolve_xm_models(repo_root, incoming_cfg, files)
         hashes = {}
         for rel, source in files.items():
             active_path = source
-            hashes[rel] = sha256_file(source)
+            hashes[rel] = installed_file_hash(source, rendered.get(rel))
         active_path = repo_root
         receipt = Receipt(compute_fingerprint(repo_root), hashes, incoming_cfg)
         if previous is not None and previous.fingerprint == receipt.fingerprint and previous != receipt:
@@ -785,7 +820,10 @@ def run_install(repo_root: Path, destination: Path, *, dry_run: bool, reset_shar
             active_path = target = destination / rel
             backup_file(target, Path(rel), backup_root)
             target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, target)
+            if rel in rendered:
+                target.write_bytes(rendered[rel])
+            else:
+                shutil.copy2(source, target)
 
         failures = verify_installed(destination, receipt.files)
         try:

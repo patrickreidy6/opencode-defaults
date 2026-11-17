@@ -117,7 +117,10 @@ def report_drift(source: Path, destination: Path, project: Path) -> int:
         raise HarnessError('No installation receipt. Run the one-time installer before checking shared harness drift.')
     pinned = install.load_baseline(source)
     incoming = install.read_config(source / 'global/opencode.json')
-    files = {name: install.sha256_file(path) for name, path in install.managed_files(source).items()}
+    sources = install.managed_files(source)
+    rendered = install.resolve_xm_models(source, incoming, sources)
+    files = {name: install.installed_file_hash(path, rendered.get(name))
+             for name, path in sources.items()}
     print(f'Default {install.compute_fingerprint(source)}')
     print(f'Installed {previous.fingerprint}')
 

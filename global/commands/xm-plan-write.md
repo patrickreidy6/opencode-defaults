@@ -1,8 +1,8 @@
 ---
-description: Write a focused Superpowers plan with Claude Fable 5.2 (high)
+description: Write a focused Superpowers plan
 agent: xm-planner
 subagent: false
-model: anthropic/claude-fable-5-2#high
+model: {{xm-model}}
 ---
 
 Write the simplest reliable implementation plan from this spec or selected plan: $ARGUMENTS

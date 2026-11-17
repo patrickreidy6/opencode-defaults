@@ -1,6 +1,6 @@
 # Cross-model workflow: design record
 
-Design record for the opt-in `/xm-*` commands, with dated verification below. Usage and the per-command model table are in the [README](../../README.md#opt-in-cross-model-workflow). Implemented in [`global/commands/`](../../global/commands/), the `xm-planner` and `xm-reviewer` agents in [`global/opencode.json`](../../global/opencode.json), and the command copy step in [`install.py`](../../install.py). The [completed initial plan](../plans/archive/cross-model-commands.md) records conversation approval; this maintained design is not a retrospective replacement for that approval source.
+Design record for the opt-in `/xm-*` commands, with dated verification below. Usage and model-switching instructions are in the [README](../../README.md#opt-in-cross-model-workflow). Implemented in [`global/commands/`](../../global/commands/), the `xm-planner` and `xm-reviewer` agents in [`global/opencode.json`](../../global/opencode.json), and the command copy step in [`install.py`](../../install.py). The [completed initial plan](../plans/archive/cross-model-commands.md) records conversation approval; this maintained design is not a retrospective replacement for that approval source.
 
 ## Document selection update, 2026-11-16
 
@@ -250,7 +250,7 @@ The Surface rollout used the standard preview and installer, with backups under 
 
 ## Changing models, prompts or permissions
 
-- **Models.** A command's model is set in its `model:` line. The planner's also appears in `agents.xm-planner.model`. The README tables list all of them, and `tests/test_install.py` asserts the `title`, `explore` and `general` defaults. Confirm the variant exists for the new model.
+- **Models.** Edit [global/xm-models.json](../../global/xm-models.json), run the installer, and reload OpenCode. Each entry supplies the named command's model. The plan-writing entry also supplies the planner agent's default. Add or remove the corresponding entry when adding or removing an XM command.
 - **Reviewer Git commands.** The `xm-reviewer` allow rules match the whole command, so a command must begin with an allowed form. In the first live run these were denied: Git with global options (`git --no-optional-locks Ã¢â‚¬Â¦`, `git -c Ã¢â‚¬Â¦`), compound lines containing any other command, `Get-FileHash`, `git ls-files` and `python`. The plan and code review prompts name the allowed standalone forms; the spec review uses read-only file and documentation tools and requires no Git metadata. If a prompt needs another Git form, add the matching rule in `global/opencode.json`.
 - **Removing or renaming a command.** The installation receipt removes an unchanged retired command on the next install, with a backup; locally changed retired commands are kept and named. No `install.py` change is needed for commands tracked by a receipt.
 - **Live check.** The unit tests cover delivery only. To check behavior without touching the global config:

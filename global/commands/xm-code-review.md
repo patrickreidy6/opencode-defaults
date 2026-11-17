@@ -1,8 +1,8 @@
 ---
-description: Whole-branch code review with Claude Fable 5.2 (high)
+description: Whole-branch code review
 agent: xm-reviewer
 subagent: true
-model: anthropic/claude-fable-5-2#high
+model: {{xm-model}}
 ---
 
 Review the current branch against this plan or spec: $ARGUMENTS

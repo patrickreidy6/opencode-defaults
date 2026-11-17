@@ -161,13 +161,15 @@ Use the OpenAI provider connected to the account that holds your API credits. Mo
 
 Use this for foundational specs and new codebases where extra independent review is worthwhile. Invoke the commands explicitly in the OpenCode TUI; normal Plan and Superpowers sessions use the ordinary workflow. Maintained artifacts from each workflow use the locations in [`naming-files`](.opencode/skills/naming-files/SKILL.md): maintained specs at `docs/specs/<topic>-design.md`, active plans at `docs/plans/YYYY-MM-DD-<topic>.md` (creation date), and completed plans at `docs/plans/archive/`. Repository instructions may specify another arrangement. The built-in Plan agent's write restriction still applies; use Build to persist its selected draft at the repository path before implementation. Design decisions, verified behavior, scripted invocation and maintenance steps are in [`docs/specs/cross-model-workflow-design.md`](docs/specs/cross-model-workflow-design.md).
 
-| Command | Model | Behavior |
-|---|---|---|
-| `/xm-spec-review <spec-path>` | GPT-6 Astra `xhigh` | Fresh reviewer judges scope and value, protects the core payoff, and recommends what to remove, shrink or defer |
-| `/xm-plan-write <spec-or-plan-path>` | Claude Fable 5.2 `high` | Current session writes or revises a focused plan with clear task outcomes, shared contracts and checks, preserving the approved scope |
-| `/xm-plan-review <plan-path>` | Gemini 4 Carbon `high` | Fresh reviewer checks technical feasibility, spec coverage, interfaces and tests |
-| `/xm-plan-simplify <plan-path>` | GPT-6 Astra `xhigh` | Fresh reviewer proposes justified reductions in scope and complexity |
-| `/xm-code-review <plan-or-spec-path> [base-ref]` | Claude Fable 5.2 `high` | Fresh reviewer verifies findings against the final branch/local state and approved requirements |
+Edit [global/xm-models.json](global/xm-models.json) to switch models. Each key is a slash command and each value is a `provider/model` with an optional `#variant`. The planner agent also follows `xm-plan-write`. Apply changes with `uv run --no-project python install.py` from this checkout, then run `/reload` in OpenCode.
+
+| Command | Behavior |
+|---|---|
+| `/xm-spec-review <spec-path>` | Fresh reviewer judges scope and value, protects the core payoff, and recommends what to remove, shrink or defer |
+| `/xm-plan-write <spec-or-plan-path>` | Current session writes or revises a focused plan with clear task outcomes, shared contracts and checks, preserving the approved scope |
+| `/xm-plan-review <plan-path>` | Fresh reviewer checks technical feasibility, spec coverage, interfaces and tests |
+| `/xm-plan-simplify <plan-path>` | Fresh reviewer proposes justified reductions in scope and complexity |
+| `/xm-code-review <plan-or-spec-path> [base-ref]` | Fresh reviewer verifies findings against the final branch/local state and approved requirements |
 
 ### Typical sequence
 
@@ -187,7 +189,7 @@ The four review commands use `xm-reviewer`, a child-only agent with file edits a
 
 `xm-spec-review` gives an opinion on whether the proposed build is worthwhile and appropriately sized, with a bias toward justified reductions. It reads the spec and relevant code/docs without requiring Git metadata. Its report identifies what to protect, what to cut and any essential gaps, then recommends a build boundary. It checks completeness where omissions threaten the intended outcome; technical plan coverage is checked by `/xm-plan-review`.
 
-`xm-plan-write` uses `xm-planner`, a primary agent with edit permissions for `docs/plans/*.md` and legacy `docs/superpowers/plans/*.md`; explicit archive denies follow both allow rules. The command itself now restricts writes to `docs/plans/`. OpenCode wildcards also match subdirectories, so the later archive denies are necessary ([permission matching](https://opencode.ai/docs/permissions#matching)). New plans go in `docs/plans/`; legacy locations are no longer part of the command workflow. Shell commands and delegation are disabled. Run it from the repository root. For a repository-defined alternative, add a project-local `agents.xm-planner.permissions` edit rule for that path and a later deny for its archive. The command pins Fable 5.2 `high` for its invocation; check the session model before later revision turns and reselect Fable 5.2 `high` if needed. The session remains in `xm-planner`; switch back to Build before editing a spec, archiving, committing, or implementing.
+`xm-plan-write` uses `xm-planner`, a primary agent with edit permissions for `docs/plans/*.md` and legacy `docs/superpowers/plans/*.md`; explicit archive denies follow both allow rules. The command itself now restricts writes to `docs/plans/`. OpenCode wildcards also match subdirectories, so the later archive denies are necessary ([permission matching](https://opencode.ai/docs/permissions#matching)). New plans go in `docs/plans/`; legacy locations are no longer part of the command workflow. Shell commands and delegation are disabled. Run it from the repository root. For a repository-defined alternative, add a project-local `agents.xm-planner.permissions` edit rule for that path and a later deny for its archive. The command selects the configured planning model for its invocation. Check the session model before later revision turns. The session remains in `xm-planner`; switch back to Build before editing a spec, archiving, committing, or implementing.
 
 The planner preserves approved exclusions and deferrals, justifies consequential implementation additions, and leaves routine coding choices to Astra. It uses the `writing-plans` structure with explicit overrides for proportional detail, no fixed review-case quota and the cross-model handoff. Verification commands in a plan are proposed checks, not executed test evidence.
 
