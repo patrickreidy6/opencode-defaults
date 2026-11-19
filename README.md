@@ -163,6 +163,8 @@ Use this for foundational specs and new codebases where extra independent review
 
 Edit [global/xm-models.json](global/xm-models.json) to switch models. Each key is a slash command and each value is a `provider/model` with an optional `#variant`. The planner agent also follows `xm-plan-write`. Apply changes with `uv run --no-project python install.py` from this checkout, then run `/reload` in OpenCode.
 
+`/xm-spec-review` and the other `/xm-*` commands use the model written into each command file at installation. Once a model change reaches public `main`, run `/shared-harness-update` from any repo using that OpenCode configuration before your next review. The updater installs the published defaults and reloads OpenCode. One update covers all repos sharing that global configuration. Repeat it on each host or container with its own configuration.
+
 | Command | Behavior |
 |---|---|
 | `/xm-spec-review <spec-path>` | Fresh reviewer judges scope and value, protects the core payoff, and recommends what to remove, shrink or defer |
