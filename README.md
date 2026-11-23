@@ -306,8 +306,6 @@ uv run --no-project --with "git+https://github.com/agentskills/agentskills.git#s
 ```
 
 ## Related Repos
-- [pr3 â€” media](https://github.com/patrickreidy6/pr3)
-- [pr5 â€” travel](https://github.com/patrickreidy6/pr5)
-- [pr6 â€” trader](https://github.com/patrickreidy6/pr6)
-- [pr7 â€” organization & workflow](https://github.com/patrickreidy6/pr7)
-- [ops-infra â€” Halo workspaces](https://github.com/patrickreidy6/ops-infra)
+- [pr-digital-organization — organization & workflow, including the media and travel tools](https://github.com/patrickreidy6/pr-digital-organization)
+- [pr-trading — trading workstation and sell-volatility scanner](https://github.com/patrickreidy6/pr-trading)
+- [ops-infra — Halo workspaces](https://github.com/patrickreidy6/ops-infra)
