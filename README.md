@@ -11,6 +11,7 @@ See the [documentation index](docs/README.md) for maintained specs, completed pl
 | `global/opencode.json` | Native OpenCode V2 model defaults and cross-model agent profiles, `superpowers` plugin, `context7` MCP, and optional `~/.config/opencode/AGENTS.local.md` |
 | `global/commands/*.md` | Global commands for cross-model planning and review, drift reports and receiving shared defaults |
 | `shared_harness.py` | Fetches public `main` for `/shared-harness-drift` and `/shared-harness-update` |
+| [Codex skill](codex/skills/shared-harness-update/SKILL.md) | Runs the same updater from the current Codex workspace with `$shared-harness-update` |
 | [.opencode/commands/publish-opencode-version.md](.opencode/commands/publish-opencode-version.md) | Project command that publishes the authoring machine's installed CLI version |
 | `global/AGENTS.md` | Short, OS-neutral global working and communication rules |
 | `.opencode/skills/writer/` | Concise, practical voice for emails and workplace/personal correspondence; use `@writer` explicitly for other prose |
@@ -101,6 +102,26 @@ python3 "$HOME/.local/share/opencode-defaults/shared_harness.py" update
 ```
 
 Use `uv run --no-project python` on Windows, or wherever preferred. `--destination <path>` selects an isolated configuration directory for diagnostics/tests. Updating also upgrades/reloads the CLI for the current user; that option does not isolate the runtime. `--check` below remains an offline strict baseline verifier, while `/shared-harness-drift` is the normal informational workflow.
+
+### Run the update from Codex
+
+In a Codex conversation in any project, enter `$shared-harness-update`. From a terminal in that project, run `codex exec '$shared-harness-update'`. Both run the updater under the current account. A Codex agent running inside a container updates that container's OpenCode installation.
+
+To enable the command for a new account, complete [the workspace installation](#install-once-per-workspace) with a current checkout of public `main`. Link the skill once from that checkout into the account's Codex skills directory. The link receives future skill changes when the updater refreshes the checkout.
+
+**Windows PowerShell**
+
+```powershell
+New-Item -ItemType Directory -Force -Path "$HOME/.agents/skills" | Out-Null
+New-Item -ItemType Junction -Path "$HOME/.agents/skills/shared-harness-update" -Target "$HOME/.local/share/opencode-defaults/codex/skills/shared-harness-update"
+```
+
+**Linux or macOS**
+
+```sh
+mkdir -p "$HOME/.agents/skills"
+ln -s "$HOME/.local/share/opencode-defaults/codex/skills/shared-harness-update" "$HOME/.agents/skills/"
+```
 
 ### Installer Behavior
 - Resolves destination to `--destination`, else `$XDG_CONFIG_HOME/opencode` (when absolute), else `~/.config/opencode`.
