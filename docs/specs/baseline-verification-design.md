@@ -39,7 +39,7 @@ The command reports the version and full revision after verifying the remote tip
 
 ### Inspect drift and receive updates
 
-Run `/shared-harness-drift` and `/updated-opencode-defaults` as separate OpenCode submissions, with no arguments. The existing `/shared-harness-update` name runs the same updater and can install the new name on its first sync. Their launchers create the dedicated public source cache if absent, then run `shared_harness.py`. Both operations require an existing valid installation receipt.
+Run `/shared-harness-drift` and `/shared-harness-update` as separate OpenCode submissions, with no arguments. Their launchers create the dedicated public source cache if absent, then run `shared_harness.py`. Both operations require an existing valid installation receipt.
 
 The driver requires the cache to be a Git clone on `main`, with the expected public `origin` and no tracked or untracked changes. It fetches public `main`, permits only a fast-forward, and runs the newly fetched driver and installer. It stops on local commits or divergent history rather than resetting them. Neither command pushes changes or updates another workspace.
 
@@ -177,7 +177,7 @@ Tests in `tests/test_install.py`, `tests/test_baseline.py`, `tests/test_shared_h
 - retirement: ordinary reinstall preserves edited retired content; shared reset removes it with backups; local additions and value-based array membership remain protected;
 - check: passes after install, one case per finding, local additions listed at the first unowned boundary without values and not failing on presence alone, list placement that reinstall would change reported as drift, `--expect` match and mismatch, destination unchanged by the check;
 - usage errors and both wrappers;
-- Drift and update tests cover clean-source refresh, freshly fetched code execution, dirty or diverged cache refusal, upstream and workspace differences, project inventory, and upgrade or reload failures. Both receiver names exercise exact CLI alignment in both directions and at the pin.
+- Drift and update tests cover clean-source refresh, freshly fetched code execution, dirty or diverged cache refusal, upstream and workspace differences, project inventory, and upgrade or reload failures. The receiver test checks retirement of the former alias and exact CLI alignment from versions below, at and above the pin.
 - Publisher tests cover pin-only commits with staged and unpublished work, repeat publication and a rejected concurrent push followed by a retry.
 
 After installer changes, run `uv run --no-project python -m unittest discover -s tests -v` and an install followed by `--check` against an isolated `--destination`, as required by the repository instructions. For portability or runtime changes, also verify the affected behavior on Windows and Linux; keep SSH outside unit tests. Use an isolated runtime environment when exercising the updater, since `--destination` isolates only configuration. Fake-CLI tests do not establish live runtime, provider or plugin readiness.

@@ -5,7 +5,7 @@ This repository maintains personal global OpenCode V2 defaults across Windows wo
 ## Source Layout
 - `global/opencode.json`: portable V2 defaults; Astra default/general/explore, Sol title, and `/xm-*` agent permissions. Merged into `~/.config/opencode/opencode.json` (or `$XDG_CONFIG_HOME/opencode/opencode.json`).
 - `baseline.json`: pinned OpenCode CLI version, also part of the baseline fingerprint.
-- `global/commands/*.md`: cross-model, drift and update commands installed under global `commands/`. The two update filenames carry the same launcher and are tested together.
+- `global/commands/*.md`: cross-model, drift and update commands installed under global `commands/`.
 - `.opencode/commands/publish-opencode-version.md` and `publish_opencode_version.py`: authoring-checkout command that publishes the installed CLI pin to public `main`.
 - `global/AGENTS.md`: OS-neutral global rules installed as `AGENTS.md`. Machine-specific instructions belong in `~/.config/opencode/AGENTS.local.md` (loaded via `instructions` when present). This root file holds repository maintenance guidance.
 - `.opencode/skills/`: shared personal Agent Skills (`writer`, `frontend-design` + `references/ui-preferences.md`, `data-preferences`, `project-setup` + `references/preferred-devtools.md`, `skill-authoring`, `naming-files`, `naming-directories`, `socratic-tutor`), installed under global `skills/`.
