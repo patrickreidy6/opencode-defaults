@@ -105,7 +105,9 @@ Use `uv run --no-project python` on Windows, or wherever preferred. `--destinati
 
 ### Run the update from Codex
 
-In a Codex conversation in any project, enter `$shared-harness-update`. From a terminal in that project, run `codex exec '$shared-harness-update'`. Both run the updater under the current account. A Codex agent running inside a container updates that container's OpenCode installation.
+In a Codex conversation in any project, enter `$shared-harness-update`. The agent updates the OpenCode installation for its current account. A Codex agent running inside a container updates that container's installation.
+
+From a terminal in a Git checkout, run `codex exec '$shared-harness-update'`. In your own container workspace without a Git checkout, run `codex exec --skip-git-repo-check '$shared-harness-update'`. If your account rejects its configured model, `codex exec -m MODEL '$shared-harness-update'` selects an available model for that invocation. Replace `MODEL` with a model listed by your Codex CLI.
 
 To enable the command for a new account, complete [the workspace installation](#install-once-per-workspace) with a current checkout of public `main`. Link the skill once from that checkout into the account's Codex skills directory. The link receives future skill changes when the updater refreshes the checkout.
 
