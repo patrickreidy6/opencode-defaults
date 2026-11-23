@@ -1,6 +1,6 @@
 # Baseline installation and verification
 
-**Status: Implemented; maintained through 2026-11-12.** The current workflow is install once, inspect drift, then receive public updates when requested in each workspace. This spec describes that workflow and its underlying installer, receipts and offline verifier. The [README](../../README.md#install-once-per-workspace) provides setup commands. The [completed baseline plan](../plans/archive/2026-11-11-baseline-verification.md) and [shared-harness plan](../plans/archive/2026-11-12-shared-harness-commands.md) retain their original approval and execution records; the latter is the approval source for the update workflow. Dated decisions and verification evidence are preserved below as history.
+**Implemented and maintained through 2026-11-22.** The author publishes the installed CLI version. Each workspace installs once, inspects drift and receives public updates on request. This spec describes the installer, receipts and offline verifier. For setup commands, see the [README](../../README.md#install-once-per-workspace). The original approvals and execution records are in the [completed baseline plan](../plans/archive/2026-11-11-baseline-verification.md) and the [shared-harness plan](../plans/archive/2026-11-12-shared-harness-commands.md).
 
 ## Intent
 
@@ -31,9 +31,15 @@ Read the CLI pin from that source's `baseline.json` and install the OpenCode run
 
 The installer creates the receipt and global slash commands. Connect providers separately in that environment. Additional projects reuse the installed global harness; do not copy the defaults into every repository.
 
+### Publish the installed CLI version
+
+Run OpenCode's built-in `/update` in the defaults authoring checkout and finish installing the release. Then run the project command `/publish-opencode-version`. It probes `opencode --version`, fetches public `main` and prepares a commit in a temporary detached checkout of that revision. The publisher verifies that the commit has the fetched parent and changes only `baseline.json` to the installed version. The push requires the remote branch to still point to that parent.
+
+The command reports the version and full revision after verifying the remote tip. An already published version returns the same tip without a commit. A rejected push can be retried against the new public parent. The publisher fast-forwards a compatible local `main` after verification and reports when local history or pin edits need separate attention.
+
 ### Inspect drift and receive updates
 
-Run `/shared-harness-drift` and `/shared-harness-update` as separate OpenCode submissions, with no arguments. Their launchers create the dedicated public source cache if absent, then run `shared_harness.py`. Both require an existing valid installation receipt; they do not replace first-time installation.
+Run `/shared-harness-drift` and `/updated-opencode-defaults` as separate OpenCode submissions, with no arguments. The existing `/shared-harness-update` name runs the same updater and can install the new name on its first sync. Their launchers create the dedicated public source cache if absent, then run `shared_harness.py`. Both operations require an existing valid installation receipt.
 
 The driver requires the cache to be a Git clone on `main`, with the expected public `origin` and no tracked or untracked changes. It fetches public `main`, permits only a fast-forward, and runs the newly fetched driver and installer. It stops on local commits or divergent history rather than resetting them. Neither command pushes changes or updates another workspace.
 
@@ -50,7 +56,7 @@ Differences are informational: a completed report exits successfully even when t
 `/shared-harness-update` applies the fetched public version in the current workspace:
 
 1. Validate the receipt and run the installer's dry-run preflight with shared-item reset enabled.
-2. Probe the CLI. If it differs from the fetched pin, run `opencode upgrade <version>` and verify the resulting version. A missing CLI requires first-time runtime setup.
+2. Probe the CLI. If it is below or above the fetched pin, run `opencode upgrade <version>` and verify the exact result. A missing CLI requires first-time runtime setup.
 3. Install with `reset_shared=True`: back up and replace shared items, retire previously managed items even when edited, and preserve workspace-only additions and project files.
 4. Verify the installed files and merged configuration, write the new receipt, then run `opencode reload`.
 
@@ -160,18 +166,19 @@ A pass does not cover the running server version, project or system overrides, e
 
 ## Files and verification
 
-[`install.py`](../../install.py) owns installation, merging, receipts, fingerprints and offline verification. [`install.ps1`](../../install.ps1) and [`install.sh`](../../install.sh) find Python/`uv` and forward options. [`shared_harness.py`](../../shared_harness.py) owns source refresh, drift reporting and updates; the two [`global/commands/`](../../global/commands/) prompts launch it. The [`project-setup` skill](../../.opencode/skills/project-setup/SKILL.md) reads the source pin, sets up or reuses the harness, and keeps project additions local.
+[`install.py`](../../install.py) owns installation, merging, receipts, fingerprints and offline verification. [`install.ps1`](../../install.ps1) and [`install.sh`](../../install.sh) find Python/`uv` and forward options. The drift and update prompts launch [`shared_harness.py`](../../shared_harness.py). The project command launches [`publish_opencode_version.py`](../../publish_opencode_version.py). The [`project-setup` skill](../../.opencode/skills/project-setup/SKILL.md) reads the source pin, sets up or reuses the harness, and keeps project additions local.
 
 Maintain the README and this spec alongside behavior changes. Publish tested changes from the development checkout to `main`; each workspace receives them only when its update command is invoked. Change `baseline.json` deliberately to select a new CLI pin. A CLI version that differs from the selected source causes the offline check to fail; the updater applies the fetched source's pin. Receipts handle subsequent retirement of managed content without adding entries to the legacy hard-coded lists.
 
-Tests in `tests/test_install.py`, `tests/test_baseline.py` and `tests/test_shared_harness.py` use temporary directories, local Git fixtures and fake CLI behavior without credentials or network. Coverage includes:
+Tests in `tests/test_install.py`, `tests/test_baseline.py`, `tests/test_shared_harness.py` and `tests/test_publish_opencode_version.py` use temporary directories, local Git fixtures and fake CLI behavior. They cover these cases.
 
 - fingerprint: stable, changes with any input, equal for a copy without `.git`, and a fixed fixture yields a recorded value so the format cannot change silently;
 - install: receipt written, repeat install stable, dry-run writes nothing, failed verification keeps the old receipt, an existing malformed/unreadable/unsupported receipt stops install and dry-run before writes;
 - retirement: ordinary reinstall preserves edited retired content; shared reset removes it with backups; local additions and value-based array membership remain protected;
 - check: passes after install, one case per finding, local additions listed at the first unowned boundary without values and not failing on presence alone, list placement that reinstall would change reported as drift, `--expect` match and mismatch, destination unchanged by the check;
 - usage errors and both wrappers;
-- drift/update: clean-source refresh and freshly fetched code execution, dirty/diverged-source refusal, upstream versus workspace differences, project inventory, no remote mutation, and explicit upgrade/reload failures.
+- Drift and update tests cover clean-source refresh, freshly fetched code execution, dirty or diverged cache refusal, upstream and workspace differences, project inventory, and upgrade or reload failures. Both receiver names exercise exact CLI alignment in both directions and at the pin.
+- Publisher tests cover pin-only commits with staged and unpublished work, repeat publication and a rejected concurrent push followed by a retry.
 
 After installer changes, run `uv run --no-project python -m unittest discover -s tests -v` and an install followed by `--check` against an isolated `--destination`, as required by the repository instructions. For portability or runtime changes, also verify the affected behavior on Windows and Linux; keep SSH outside unit tests. Use an isolated runtime environment when exercising the updater, since `--destination` isolates only configuration. Fake-CLI tests do not establish live runtime, provider or plugin readiness.
 

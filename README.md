@@ -9,8 +9,9 @@ See the [documentation index](docs/README.md) for maintained specs, completed pl
 | Source | Installed location / purpose |
 |---|---|
 | `global/opencode.json` | Native OpenCode V2 model defaults and cross-model agent profiles, `superpowers` plugin, `context7` MCP, and optional `~/.config/opencode/AGENTS.local.md` |
-| `global/commands/*.md` | Five opt-in `/xm-*` cross-model planning and review commands installed into global `commands/` |
-| `shared_harness.py` + `/shared-harness-*` | Receive-only public updates and neutral per-workspace difference reports |
+| `global/commands/*.md` | Global commands for cross-model planning and review, drift reports and receiving shared defaults |
+| `shared_harness.py` | Fetches public `main` for `/shared-harness-drift`, `/shared-harness-update` and its alias `/updated-opencode-defaults` |
+| [.opencode/commands/publish-opencode-version.md](.opencode/commands/publish-opencode-version.md) | Project command that publishes the authoring machine's installed CLI version |
 | `global/AGENTS.md` | Short, OS-neutral global working and communication rules |
 | `.opencode/skills/writer/` | Concise, practical voice for emails and workplace/personal correspondence; use `@writer` explicitly for other prose |
 | `.opencode/skills/frontend-design/` | Visual UI design craft + `references/ui-preferences.md` for greenfield interfaces |
@@ -57,6 +58,14 @@ sh ./install.sh
 
 Keep this checkout as the workspace's clean upstream cache. Author improvements in your normal `opencode-defaults` development checkout and push them to `main`; each workspace chooses when to receive them. The installer adds the global slash commands, so they are available from any project in that workspace.
 
+## Publish an OpenCode version
+
+1. Open the `opencode-defaults` authoring checkout in OpenCode. Run the built-in `/update` and finish the CLI installation. If you already installed the release you want, go straight to publication.
+2. In the same checkout, run `/publish-opencode-version` with no arguments. It reads `opencode --version` and uses your Git credentials to publish a commit changing only `baseline.json` on public `main`. It reports the version and verified revision. Repeating it for the published version returns the existing revision.
+3. From any project using a receiving OpenCode installation, run `/updated-opencode-defaults`. If that name is missing, run `/shared-harness-update` once to receive the alias and the published pin together. One sync covers every project sharing that installation.
+
+The publisher builds its commit from public `main` so you can use it with staged edits or unpublished commits. After verification it fast-forwards the authoring checkout when the only incoming file change is the pin and your local pin is clean. It reports when the checkout needs a separate sync. The equivalent terminal command from the authoring repository root is `uv run --no-project python publish_opencode_version.py`.
+
 ## Periodic Drift and Update
 
 Run each command as its own OpenCode submission:
@@ -77,14 +86,14 @@ Differences are normal. The report changes no installed or project files; only i
 When ready, run:
 
 ```text
-/shared-harness-update
+/updated-opencode-defaults
 ```
 
-**Behavior 2:** receive and apply public `main` in this workspace. Back up and replace edited shared files/settings, and remove previously managed retired items even if edited. Preserve workspace-only additions, provider credentials, `AGENTS.local.md`, and project files. Shared MCP definitions are replaced as complete definitions; shared root-array entries are tracked by value, with additional local entries preserved. No changes are sent upstream, proposed for review, or applied to another workspace.
+`/updated-opencode-defaults` and `/shared-harness-update` run the same updater. It receives public `main` in this workspace, backs up edited shared files and settings, and removes previously managed retired items even if edited. It preserves workspace-only additions, provider credentials, `AGENTS.local.md` and project files. Shared MCP definitions are replaced as complete definitions. Shared root-array entries are tracked by value, with additional local entries preserved.
 
-The command fast-forwards only a clean `main` cache and runs its newly fetched updater. Dirty/diverged source checkouts or invalid receipts stop with an error. Existing receipt validation and backups still apply. The updater verifies the installation, applies the CLI pin with `opencode upgrade <version>` if necessary, and reloads configuration. If the CLI binary changed, it asks you to run `opencode service restart` from a terminal so it does not terminate the OpenCode session performing the update.
+The command fast-forwards a clean `main` cache and runs its newly fetched updater. Dirty or diverged source checkouts and invalid receipts stop with an error. The updater runs `opencode upgrade <version>` when the installed CLI is older **or newer** than the pin. It verifies the exact version, installs and verifies the defaults, and reloads configuration. If the binary changed, run `opencode service restart` from a terminal when the updater asks.
 
-Both slash commands use a small fixed Python driver and one shell call on GPT-6.1 Sol low. They accept no arguments. They create `~/.local/share/opencode-defaults` on first use if an older installation was made elsewhere. The equivalent terminal commands, from any active project, are:
+The drift and update commands use a small fixed Python driver and one shell call on GPT-6.1 Sol low. They accept no arguments. They create `~/.local/share/opencode-defaults` on first use if an older installation was made elsewhere. You can also run the driver from any active project.
 
 ```sh
 python3 "$HOME/.local/share/opencode-defaults/shared_harness.py" drift --project .
@@ -140,7 +149,7 @@ Exit codes: **0** for a match (or successful install/fingerprint), **1** for any
 
 `Local` lines name additions at the first unowned boundary: configuration key paths, extra-entry counts in root `plugins` / `instructions` / `skills` lists, local files under `agents/`, `commands/`, `skills/` and `plugins/`, and `AGENTS.local.md`. Nonempty unowned directories are named once without inspecting their trees. Each workspace can have its own additions; their presence alone never fails the check. The strict verifier preserves JSON types and list order; the slash-command drift report presents such differences neutrally.
 
-To improve the defaults, edit and test this repo, then commit and push to `main`. Workspaces receive those improvements only when you invoke `/shared-harness-update` there. Choose a tested CLI version in `baseline.json`; updates apply that pin. There is no central rollout service, shared GitHub credential, or private-repository archive-delivery step.
+To improve the defaults, edit and test this repo, then commit and push to `main`. Use `/publish-opencode-version` to select the installed CLI as the pin. Each workspace receives changes when you invoke either update name there.
 
 The check covers only the installed global baseline and CLI version, **not** the running server version, project or system overrides, environment substitutions, plugin loading, MCP connectivity, provider access or model behavior. It detects accidental drift and is **not tamper-proof**: the source and installer are writable by the workspace user.
 

@@ -1692,7 +1692,7 @@ class WrapperTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
-        self.env = cli_env(self.root, "2.2.7", isolate=False)
+        self.env = cli_env(self.root, install.load_baseline(REPO_ROOT), isolate=False)
 
     def run_wrapper(self, *args: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(

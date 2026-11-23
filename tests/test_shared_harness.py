@@ -2,6 +2,7 @@ import contextlib
 import io
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -162,6 +163,18 @@ class DriftTests(unittest.TestCase):
         self.assertEqual(runtime.call_args_list, [mock.call('upgrade', '2.2.7'), mock.call('reload')])
         self.assertIn('opencode service restart', output.getvalue())
 
+    def test_successful_upgrade_with_wrong_version_stops_before_install_or_reload(self):
+        before = snapshot(self.dest)
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output), \
+                mock.patch.object(install, 'probe_opencode_version', return_value=('ok', '2.4.0')), \
+                mock.patch.object(shared_harness, 'run_opencode') as runtime:
+            with self.assertRaisesRegex(shared_harness.HarnessError, 'version still differs'):
+                shared_harness.apply_update(self.source, self.dest)
+        self.assertEqual(runtime.call_args_list, [mock.call('upgrade', '2.2.7')])
+        self.assertEqual(snapshot(self.dest), before)
+        self.assertNotIn('Shared harness updated', output.getvalue())
+
     def test_invalid_install_stops_before_runtime_upgrade(self):
         (self.dest / install.RECEIPT_NAME).write_bytes(b'invalid')
         before = snapshot(self.dest)
@@ -265,6 +278,100 @@ class GitSourceTests(unittest.TestCase):
             result = shared_harness.dispatch('drift', self.local, self.root / 'dest', self.root)
         self.assertEqual(result.returncode, 0)
         self.assertIn('CURRENT DRIVER drift', result.stdout)
+
+
+class ReceiverCommandTests(unittest.TestCase):
+    def test_old_command_delivers_alias_and_both_align_cli_in_either_direction(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            env = cli_env(root, None)
+            env['PATH'] += os.pathsep + os.environ['PATH']
+            env['XDG_CONFIG_HOME'] = str(root / 'home/.config')
+            env['GIT_ALLOW_PROTOCOL'] = 'file'
+            destination = root / 'home/.config/opencode'
+            project = root / 'project'
+            project.mkdir()
+            (project / 'AGENTS.md').write_bytes(b'project-owned instructions\n')
+            (project / 'opencode.json').write_bytes(b'{"model":"project-model"}\n')
+            project_before = snapshot(project)
+
+            old_name = 'shared-harness-update'
+            alias = 'updated-opencode-defaults'
+            commands = REPO_ROOT / 'global/commands'
+            source = make_source(root / 'upstream', {
+                **DEFAULT_SOURCE,
+                f'global/commands/{old_name}.md': (commands / f'{old_name}.md').read_bytes(),
+            })
+            # Exercise the production driver against a local Git remote in the child process.
+            shutil.copy2(REPO_ROOT / 'shared_harness.py', source / 'receiver.py')
+            (source / 'shared_harness.py').write_text(
+                f'import receiver\nreceiver.PUBLIC_REPO = {str(source)!r}\nraise SystemExit(receiver.main())\n',
+                encoding='utf-8',
+            )
+            (source / '.gitignore').write_bytes(b'__pycache__/\n')
+
+            def git(*args):
+                return subprocess.run(['git', *args], cwd=source, capture_output=True,
+                                      text=True, check=True).stdout.strip()
+
+            git('init', '-b', 'main')
+            git('config', 'user.name', 'Fixture')
+            git('config', 'user.email', 'fixture@example.invalid')
+            git('config', 'commit.gpgSign', 'false')
+            git('add', '.')
+            git('commit', '-m', 'old receiver')
+            cache = root / 'home/.local/share/opencode-defaults'
+            cache.parent.mkdir(parents=True)
+            git('clone', str(source), str(cache))
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(install.run_install(source, destination, dry_run=False), 0)
+            self.assertFalse((destination / f'commands/{alias}.md').exists())
+            (source / 'baseline.json').write_bytes(b'{"opencode": "2.3.2"}\n')
+            shutil.copy2(commands / f'{alias}.md', source / f'global/commands/{alias}.md')
+            git('add', '.')
+            git('commit', '-m', 'publish pin and alias')
+            revision = git('rev-parse', 'HEAD')
+
+            bin_dir = root / 'bin'
+            runtime = bin_dir / 'runtime.py'
+            runtime.write_text(
+                'from pathlib import Path\nimport sys\n'
+                'state = Path(__file__).with_name("version")\n'
+                'args = sys.argv[1:]\n'
+                'with state.with_name("calls").open("a") as log:\n    print(*args, file=log)\n'
+                'if args == ["--version"]:\n    print("opencode v" + state.read_text())\n'
+                'elif args == ["upgrade", "2.3.2"]:\n    state.write_text(args[1])\n'
+                'elif args != ["reload"]:\n    sys.exit(2)\n', encoding='utf-8',
+            )
+            if os.name == 'nt':
+                (bin_dir / 'opencode.cmd').write_text(f'@echo off\n"{sys.executable}" "{runtime}" %*\n')
+            else:
+                executable = bin_dir / 'opencode'
+                executable.write_text(f'#!/bin/sh\nexec {shlex.quote(sys.executable)} {shlex.quote(str(runtime))} "$@"\n')
+                executable.chmod(0o755)
+
+            for name in (old_name, alias):
+                for start in ('2.2.7', '2.3.2', '2.4.0'):
+                    with self.subTest(command=name, installed=start):
+                        (bin_dir / 'version').write_text(start)
+                        (bin_dir / 'calls').write_text('')
+                        prompt = (destination / f'commands/{name}.md').read_text(encoding='utf-8')
+                        launcher = prompt.split('```python\n', 1)[1].split('\n```', 1)[0]
+                        result = subprocess.run([sys.executable, '-c', launcher], cwd=project, env=env,
+                                                capture_output=True, text=True, timeout=60)
+                        self.assertEqual(result.returncode, 0, result.stderr)
+                        self.assertIn(f'Published main {revision}', result.stdout)
+                        self.assertEqual((bin_dir / 'version').read_text(), '2.3.2')
+                        calls = ['--version']
+                        if start != '2.3.2':
+                            calls.extend(['upgrade 2.3.2', '--version'])
+                        self.assertEqual((bin_dir / 'calls').read_text().splitlines(), [*calls, 'reload'])
+                        self.assertEqual('opencode service restart' in result.stdout, start != '2.3.2')
+                        self.assertEqual(snapshot(project), project_before)
+                        self.assertEqual((destination / f'commands/{alias}.md').read_bytes(),
+                                         (destination / f'commands/{old_name}.md').read_bytes())
+                        self.assertIn(f'commands/{alias}.md', install.read_receipt(destination).files)
+                        self.assertFalse((destination / 'commands/publish-opencode-version.md').exists())
 
 
 if __name__ == '__main__':
